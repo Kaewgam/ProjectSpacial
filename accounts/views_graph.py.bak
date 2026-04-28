@@ -1,0 +1,46 @@
+from django.http import JsonResponse
+from neo4j import GraphDatabase
+
+URI = "bolt://localhost:7687"
+USER = "neo4j"
+PASSWORD = "12345678"
+
+driver = GraphDatabase.driver(URI, auth=(USER, PASSWORD))
+
+
+def get_graph_data(request):
+    with driver.session() as session:
+        result = session.run("""
+            MATCH (u1:User)-[r:KNOWS]->(u2:User)
+            RETURN u1, r, u2
+        """)
+
+        nodes = []
+        links = []
+
+        for record in result:
+            u1 = record["u1"]
+            u2 = record["u2"]
+
+            nodes.append({
+                "id": u1["student_id"],
+                "name": u1.get("name", u1["student_id"])
+            })
+
+            nodes.append({
+                "id": u2["student_id"],
+                "name": u2.get("name", u2["student_id"])
+            })
+
+            links.append({
+                "source": u1["student_id"],
+                "target": u2["student_id"]
+            })
+
+        # กัน node ซ้ำ
+        nodes = {n["id"]: n for n in nodes}.values()
+
+        return JsonResponse({
+            "nodes": list(nodes),
+            "links": links
+        })

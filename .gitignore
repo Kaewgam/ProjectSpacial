@@ -1,0 +1,73 @@
+# ========================
+# Python / Django
+# ========================
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Virtual Environment
+venv/
+env/
+ENV/
+.venv/
+
+# Django
+*.sqlite3
+*.log
+local_settings.py
+db.sqlite3
+media/
+
+# Environment Variables (สำคัญมาก! ห้ามอัพ)
+.env
+.env.*
+!.env.example
+
+# ========================
+# Node.js / Next.js
+# ========================
+node_modules/
+.next/
+out/
+build/
+dist/
+
+# Next.js env files
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# npm / yarn
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# ========================
+# OS Files
+# ========================
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ========================
+# IDE / Editor
+# ========================
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# ========================
+# Misc
+# ========================
+*.pem
+.cache/

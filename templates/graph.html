@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <title>Alumni Network Graph</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #0f0f1a;
+      color: #e2e8f0;
+      font-family: 'Segoe UI', sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding: 24px;
+    }
+
+    h2 {
+      font-size: 1.8rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+      background: linear-gradient(90deg, #a78bfa, #60a5fa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    p.subtitle {
+      color: #94a3b8;
+      margin-bottom: 20px;
+      font-size: 0.9rem;
+    }
+
+    #legend {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-bottom: 16px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.82rem;
+      color: #94a3b8;
+    }
+
+    .legend-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+    }
+
+    #viz {
+      width: 100%;
+      max-width: 1000px;
+      height: 600px;
+      border-radius: 16px;
+      border: 1px solid #1e293b;
+      background: #0f172a;
+      box-shadow: 0 0 40px rgba(139, 92, 246, 0.2);
+      overflow: hidden;
+    }
+
+    #status {
+      margin-top: 12px;
+      font-size: 0.85rem;
+      color: #64748b;
+      max-width: 800px;
+      text-align: center;
+    }
+
+    #debug {
+      margin-top: 8px;
+      font-size: 0.75rem;
+      color: #475569;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>Alumni Network Graph</h2>
+  <p class="subtitle">แสดงความสัมพันธ์ศิษย์เก่า — ดึงข้อมูลจาก Neo4j โดยตรง</p>
+
+  <div id="legend">
+    <div class="legend-item">
+      <div class="legend-dot" style="background:#a78bfa;"></div> User
+    </div>
+    <div class="legend-item">
+      <div class="legend-dot" style="background:#34d399;"></div> Faculty
+    </div>
+    <div class="legend-item">
+      <div class="legend-dot" style="background:#60a5fa;"></div> Department
+    </div>
+    <div class="legend-item">
+      <div class="legend-dot" style="background:#f59e0b;"></div> Company
+    </div>
+  </div>
+
+  <div id="viz"></div>
+  <p id="status">กำลังโหลดกราฟ...</p>
+  <p id="debug"></p>
+
+  <script src="https://unpkg.com/neovis.js@2.0.2/dist/neovis.js"></script>
+  <script>
+    const config = {
+      containerId: "viz",
+      neo4j: {
+        serverUrl: "bolt://127.0.0.1:7687",
+        serverUser: "neo4j",
+        serverPassword: "12345678",
+      },
+      labels: {
+        User:       { label: "name",  color: "#a78bfa", size: 20 },
+        Faculty:    { label: "name",  color: "#34d399", size: 16 },
+        Department: { label: "name",  color: "#60a5fa", size: 16 },
+        Company:    { label: "name",  color: "#f59e0b", size: 16 },
+      },
+      relationships: {
+        KNOWS:      { caption: true, thickness: "weight" },
+        STUDIED_IN: { caption: true },
+        BELONGS_TO: { caption: true },
+        WORKS_AS:   { caption: true },
+      },
+      // ดึงทุก node และ relationship จาก Neo4j
+      initialCypher: `
+        MATCH (n)
+        OPTIONAL MATCH (n)-[r]->(m)
+        RETURN n, r, m
+        LIMIT 200
+      `,
+      visConfig: {
+        nodes: {
+          font: { color: "#e2e8f0", size: 13 },
+          borderWidth: 2,
+        },
+        edges: {
+          color: { color: "#475569", highlight: "#a78bfa", hover: "#818cf8" },
+          arrows: { to: { enabled: true, scaleFactor: 0.7 } },
+          font: { color: "#94a3b8", size: 10, align: "middle" },
+          smooth: { type: "dynamic" },
+          width: 1.5,
+        },
+        physics: {
+          solver: "forceAtlas2Based",
+          forceAtlas2Based: {
+            gravitationalConstant: -80,
+            centralGravity: 0.005,
+            springLength: 150,
+            springConstant: 0.05,
+            damping: 0.9,
+          },
+          stabilization: { iterations: 200
+          },
+        },
+        interaction: {
+          hover: true,
+          navigationButtons: true,
+          keyboard: true,
+          tooltipDelay: 100,
+        },
+      },
+    };
+
+    const viz = new NeoVis.default(config);
+
+    viz.registerOnEvent("completed", (e) => {
+      const nodeCount = e.nodeCount ?? "?";
+      const edgeCount = e.edgeCount ?? "?";
+      document.getElementById("status").textContent =
+        `✅ โหลดกราฟสำเร็จ — ${nodeCount} nodes, ${edgeCount} relationships`;
+      document.getElementById("debug").textContent =
+        "ลากโหนดได้ | scroll เพื่อ zoom | hover เพื่อดูชื่อ";
+    });
+
+    viz.registerOnEvent("error", (err) => {
+      let msg = typeof err === "string" ? err
+        : err?.message ?? JSON.stringify(err);
+      document.getElementById("status").innerHTML =
+        `❌ เชื่อม Neo4j ไม่ได้<br><small style='color:#ef4444'>${msg}</small>`;
+      console.error("NeoVis error:", err);
+    });
+
+    viz.render();
+  </script>
+</body>
+</html>

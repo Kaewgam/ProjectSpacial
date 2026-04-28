@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Alumni Graph</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+</head>
+<body>
+
+<h2>Alumni Network Graph</h2>
+<svg width="800" height="600"></svg>
+
+<script>
+fetch("/graph/")
+  .then(res => res.json())
+  .then(data => {
+    const svg = d3.select("svg");
+
+    const simulation = d3.forceSimulation(data.nodes)
+      .force("link", d3.forceLink(data.links).id(d => d.id).distance(150))
+      .force("charge", d3.forceManyBody().strength(-300))
+      .force("center", d3.forceCenter(400, 300));
+
+    const link = svg.append("g")
+      .selectAll("line")
+      .data(data.links)
+      .enter()
+      .append("line")
+      .style("stroke", "#aaa");
+
+    const node = svg.append("g")
+      .selectAll("circle")
+      .data(data.nodes)
+      .enter()
+      .append("circle")
+      .attr("r", 10)
+      .style("fill", "green");
+
+    const label = svg.append("g")
+      .selectAll("text")
+      .data(data.nodes)
+      .enter()
+      .append("text")
+      .text(d => d.name)
+      .attr("font-size", 12);
+
+    simulation.on("tick", () => {
+      link
+        .attr("x1", d => d.source.x)
+        .attr("y1", d => d.source.y)
+        .attr("x2", d => d.target.x)
+        .attr("y2", d => d.target.y);
+
+      node
+        .attr("cx", d => d.x)
+        .attr("cy", d => d.y);
+
+      label
+        .attr("x", d => d.x + 10)
+        .attr("y", d => d.y);
+    });
+  });
+</script>
+
+</body>
+</html>
