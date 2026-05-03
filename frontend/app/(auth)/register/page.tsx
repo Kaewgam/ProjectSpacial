@@ -3,16 +3,10 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import toast, { Toaster } from "react-hot-toast";
-import { User, Lock, Mail, Briefcase, BookOpen, GraduationCap } from "lucide-react";
+import { User, Lock, Mail, Briefcase, BookOpen, GraduationCap, Building2, Info, CheckCircle, Eye, EyeOff } from "lucide-react";
 import api from "@/lib/api";
+import { useFacultyDept } from "@/lib/useFacultyDept";
 
-const FACULTIES: Record<string, string[]> = {
-    "คณะวิศวกรรมศาสตร์": ["วิศวกรรมคอมพิวเตอร์", "วิศวกรรมไฟฟ้า", "วิศวกรรมโยธา", "วิศวกรรมเครื่องกล"],
-    "คณะวิทยาศาสตร์": ["วิทยาการคอมพิวเตอร์", "คณิตศาสตร์", "ฟิสิกส์", "เคมี"],
-    "คณะบริหารธุรกิจ": ["การจัดการ", "การตลาด", "การบัญชี", "การเงิน"],
-    "คณะศิลปศาสตร์": ["ภาษาไทย", "ภาษาอังกฤษ", "ภาษาจีน", "ประวัติศาสตร์"],
-    "คณะแพทยศาสตร์": ["แพทย์ทั่วไป", "ทันตแพทย์", "เภสัชศาสตร์", "พยาบาลศาสตร์"],
-};
 
 export default function Register() {
     const router = useRouter();
@@ -24,17 +18,22 @@ export default function Register() {
         student_id: "",
         email: "",
         password: "",
-        faculty: "",
-        department: "",
+        faculty_id: null as number | null,
+        department_id: null as number | null,
         occupation: "",
+        company: "",
     });
+
+    const { faculties, filteredDepts, loading: fdLoading } = useFacultyDept(form.faculty_id);
+
     const [submitting, setSubmitting] = useState(false);
+    const [showPass, setShowPass] = useState(false);
 
     const set = (field: string, value: string) =>
         setForm((prev) => ({ ...prev, [field]: value }));
 
-    const handleFacultyChange = (faculty: string) => {
-        setForm((prev) => ({ ...prev, faculty, department: "" }));
+    const handleFacultyChange = (facultyId: number | null) => {
+        setForm((prev) => ({ ...prev, faculty_id: facultyId, department_id: null }));
     };
 
     const handleRegister = async () => {
@@ -43,10 +42,32 @@ export default function Register() {
             return;
         }
 
+        if (form.password.length <= 6) {
+            toast.error("ตัวอักษรความยาวมากกว่า 6 ");
+            return;
+        }
+        if (!/[A-Z]/.test(form.password)) {
+            toast.error("ตัวอักษรพิมพ์ใหญ่อย่างน้อย 1 ตัว");
+            return;
+        }
+        if (!/[0-9]/.test(form.password)) {
+            toast.error("ตัวเลขอย่างน้อย 1 ตัว");
+            return;
+        }
+
         try {
             setSubmitting(true);
             await api.post("/api/register/", {
-                ...form,
+                prefix: form.prefix,
+                first_name: form.first_name,
+                last_name: form.last_name,
+                student_id: form.student_id,
+                email: form.email,
+                password: form.password,
+                occupation: form.occupation,
+                company: form.company,
+                faculty_id: form.faculty_id,
+                department_id: form.department_id,
                 role: "ALUMNI",
             });
             toast.success("สมัครสมาชิกสำเร็จ 🎉");
@@ -156,30 +177,30 @@ export default function Register() {
                                 <label className={labelClass}>คณะ</label>
                                 <div className="relative">
                                     <select
-                                        value={form.faculty}
-                                        onChange={(e) => handleFacultyChange(e.target.value)}
+                                        value={form.faculty_id ?? ""}
+                                        onChange={(e) => handleFacultyChange(e.target.value ? Number(e.target.value) : null)}
                                         className={selectClass}
                                     >
                                         <option value="">เลือกคณะ</option>
-                                        {Object.keys(FACULTIES).map((f) => (
-                                            <option key={f} value={f}>{f}</option>
+                                        {faculties.map((f) => (
+                                            <option key={f.id} value={f.id}>{f.name}</option>
                                         ))}
                                     </select>
                                     <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">▾</span>
                                 </div>
                             </div>
                             <div>
-                                <label className={labelClass}>สาขา</label>
+                                <label className={labelClass}>สาขาวิชา</label>
                                 <div className="relative">
                                     <select
-                                        value={form.department}
-                                        onChange={(e) => set("department", e.target.value)}
-                                        disabled={!form.faculty}
-                                        className={`${selectClass} ${!form.faculty ? "opacity-50 cursor-not-allowed" : ""}`}
+                                        value={form.department_id ?? ""}
+                                        onChange={(e) => setForm(prev => ({ ...prev, department_id: e.target.value ? Number(e.target.value) : null }))}
+                                        disabled={!form.faculty_id}
+                                        className={`${selectClass} ${!form.faculty_id ? "opacity-50 cursor-not-allowed" : ""}`}
                                     >
-                                        <option value="">เลือกสาขา</option>
-                                        {(FACULTIES[form.faculty] ?? []).map((d) => (
-                                            <option key={d} value={d}>{d}</option>
+                                        <option value="">เลือกสาขาวิชา</option>
+                                        {filteredDepts.map((d) => (
+                                            <option key={d.id} value={d.id}>{d.name}</option>
                                         ))}
                                     </select>
                                     <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">▾</span>
@@ -208,13 +229,25 @@ export default function Register() {
                                 </div>
                             </div>
                             <div>
-                                <label className={labelClass}>อาชีพปัจจุบัน</label>
+                                <label className={labelClass}>ตำแหน่ง</label>
                                 <div className="relative">
                                     <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                                     <input
                                         value={form.occupation}
                                         onChange={(e) => set("occupation", e.target.value)}
                                         placeholder="เช่น วิศวกร, นักพัฒนาซอฟต์แวร์"
+                                        className={`${inputClass} pl-9`}
+                                    />
+                                </div>
+                            </div>
+                            <div>
+                                <label className={labelClass}>หน่วยงาน / สังกัด</label>
+                                <div className="relative">
+                                    <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                                    <input
+                                        value={form.company}
+                                        onChange={(e) => set("company", e.target.value)}
+                                        placeholder="เช่น บริษัท, โรงงาน, สถาบัน"
                                         className={`${inputClass} pl-9`}
                                     />
                                 </div>
@@ -232,12 +265,36 @@ export default function Register() {
                             <div className="relative">
                                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                                 <input
-                                    type="password"
+                                    type={showPass ? "text" : "password"}
                                     value={form.password}
                                     onChange={(e) => set("password", e.target.value)}
                                     placeholder="••••••••"
-                                    className={`${inputClass} pl-9`}
+                                    className={`${inputClass} pl-9 pr-12`}
                                 />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPass(!showPass)}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition"
+                                >
+                                    {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
+                                </button>
+                            </div>
+                            
+                            {/* Password Rules Checklist */}
+                            <div className="mt-3 space-y-1.5 p-3 bg-gray-50 rounded-lg border border-gray-100">
+                                <p className="text-xs font-semibold text-gray-600 mb-2">รหัสผ่านต้องประกอบด้วย:</p>
+                                <div className={`flex items-center gap-2 text-xs transition-colors ${form.password.length > 6 ? "text-emerald-600" : "text-gray-400"}`}>
+                                    {form.password.length > 6 ? <CheckCircle size={14} className="flex-shrink-0" /> : <Info size={14} className="flex-shrink-0" />}
+                                    <span>ตัวอักษรความยาวมากกว่า 6</span>
+                                </div>
+                                <div className={`flex items-center gap-2 text-xs transition-colors ${/[A-Z]/.test(form.password) ? "text-emerald-600" : "text-gray-400"}`}>
+                                    {/[A-Z]/.test(form.password) ? <CheckCircle size={14} className="flex-shrink-0" /> : <Info size={14} className="flex-shrink-0" />}
+                                    <span>ตัวอักษรพิมพ์ใหญ่อย่างน้อย 1 ตัว</span>
+                                </div>
+                                <div className={`flex items-center gap-2 text-xs transition-colors ${/[0-9]/.test(form.password) ? "text-emerald-600" : "text-gray-400"}`}>
+                                    {/[0-9]/.test(form.password) ? <CheckCircle size={14} className="flex-shrink-0" /> : <Info size={14} className="flex-shrink-0" />}
+                                    <span>ตัวเลขอย่างน้อย 1 ตัว</span>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -247,8 +304,8 @@ export default function Register() {
                         onClick={handleRegister}
                         disabled={submitting}
                         className={`w-full py-3 rounded-xl text-white font-semibold text-base transition-all duration-300 ${submitting
-                                ? "bg-gray-400 cursor-not-allowed"
-                                : "bg-[#414E51] hover:bg-[#2b3436] hover:shadow-lg"
+                            ? "bg-gray-400 cursor-not-allowed"
+                            : "bg-[#414E51] hover:bg-[#2b3436] hover:shadow-lg"
                             }`}
                     >
                         {submitting ? "กำลังสมัคร..." : "สร้างบัญชี"}

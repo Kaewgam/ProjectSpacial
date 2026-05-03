@@ -8,13 +8,14 @@ export interface AuthUser {
     id: string;
     student_id: string;
     email: string;
-    role: "ALUMNI" | "ADMIN" | "STUDENT";
+    role: "ALUMNI" | "ADMIN";
     prefix: string;
     first_name: string;
     last_name: string;
     faculty: string;
     department: string;
     occupation: string;
+    company: string;
     date_joined: string;
     avatar: string | null;
 }

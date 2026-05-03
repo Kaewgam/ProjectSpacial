@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import api from "@/lib/api";
 import {
   Users, UserCheck, UserPlus, Activity,
-  Database, GitBranch, TrendingUp, RefreshCw
+  Database, GitBranch, TrendingUp, RefreshCw,
+  Building2, GraduationCap, FileText, Settings
 } from "lucide-react";
 
 // ─── Types ───────────────────────────────────────────
@@ -13,9 +15,11 @@ interface Stats {
   active_users: number;
   new_7d: number;
   new_30d: number;
-  role_counts: { ALUMNI: number; STUDENT: number; ADMIN: number };
+  role_counts: { ALUMNI: number; ADMIN: number };
   faculty_stats: { faculty: string; count: number }[];
-  neo4j: { connected: boolean; nodes: number; relationships: number };
+  department_stats: { department: string; count: number }[];
+  generation_stats: { generation: string; count: number }[];
+  neo4j: { connected: boolean; nodes: number; relationships: number; companies: number; departments: number };
 }
 
 // ─── Stat Card ───────────────────────────────────────
@@ -33,8 +37,8 @@ function StatCard({
   accent: string;
 }) {
   return (
-    <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 flex gap-4 items-start
-                    hover:border-slate-700 transition-colors">
+    <div className="bg-white border border-gray-200 shadow-sm rounded-2xl p-5 flex gap-4 items-start
+                    hover:border-gray-300 hover:shadow-md transition-all">
       <div
         className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
         style={{ background: `${accent}20` }}
@@ -42,39 +46,14 @@ function StatCard({
         <Icon size={20} style={{ color: accent }} />
       </div>
       <div>
-        <p className="text-2xl font-bold text-white">{value.toLocaleString()}</p>
-        <p className="text-sm text-slate-400 mt-0.5">{label}</p>
-        {sub && <p className="text-xs text-slate-600 mt-1">{sub}</p>}
+        <p className="text-2xl font-bold text-gray-900">{value.toLocaleString()}</p>
+        <p className="text-sm text-gray-500 mt-0.5">{label}</p>
+        {sub && <p className="text-xs text-gray-400 mt-1">{sub}</p>}
       </div>
     </div>
   );
 }
 
-// ─── Role Badge ──────────────────────────────────────
-function RolePill({ role, count, total }: { role: string; count: number; total: number }) {
-  const colors: Record<string, string> = {
-    ALUMNI: "#a78bfa",
-    STUDENT: "#60a5fa",
-    ADMIN: "#f87171",
-  };
-  const color = colors[role] ?? "#94a3b8";
-  const pct = total > 0 ? Math.round((count / total) * 100) : 0;
-
-  return (
-    <div className="flex flex-col gap-1.5">
-      <div className="flex justify-between text-sm">
-        <span className="font-medium" style={{ color }}>{role}</span>
-        <span className="text-slate-400">{count} ({pct}%)</span>
-      </div>
-      <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
-        <div
-          className="h-full rounded-full transition-all duration-700"
-          style={{ width: `${pct}%`, background: color }}
-        />
-      </div>
-    </div>
-  );
-}
 
 // ─── Main Page ────────────────────────────────────────
 export default function AdminDashboard() {
@@ -109,7 +88,7 @@ export default function AdminDashboard() {
     return (
       <div className="flex flex-col items-center justify-center h-full min-h-96 gap-4">
         <p className="text-red-400">{error || "เกิดข้อผิดพลาด"}</p>
-        <button onClick={fetchStats} className="text-xs text-slate-400 hover:text-white transition">
+        <button onClick={fetchStats} className="text-xs text-gray-500 hover:text-gray-900 transition">
           ลองอีกครั้ง
         </button>
       </div>
@@ -121,13 +100,12 @@ export default function AdminDashboard() {
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-white">Dashboard</h1>
-          <p className="text-slate-400 text-sm mt-1">ภาพรวมระบบ Alumni Network</p>
+          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
         </div>
         <button
           onClick={fetchStats}
-          className="flex items-center gap-2 text-sm text-slate-400 hover:text-white
-                     bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-lg transition"
+          className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900
+                     bg-white border border-gray-200 shadow-sm hover:bg-gray-50 px-4 py-2 rounded-lg transition"
         >
           <RefreshCw size={14} />
           รีเฟรช
@@ -135,7 +113,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 gap-4 mb-8">
         <StatCard
           icon={Users}
           label="ผู้ใช้ทั้งหมด"
@@ -143,101 +121,164 @@ export default function AdminDashboard() {
           accent="#a78bfa"
         />
         <StatCard
-          icon={UserCheck}
-          label="บัญชีที่ใช้งานอยู่"
-          value={stats.active_users}
-          sub={`${stats.total_users > 0 ? Math.round((stats.active_users / stats.total_users) * 100) : 0}% ของทั้งหมด`}
-          accent="#34d399"
-        />
-        <StatCard
-          icon={UserPlus}
-          label="สมาชิกใหม่ (7 วัน)"
-          value={stats.new_7d}
-          sub={`30 วัน: ${stats.new_30d} คน`}
-          accent="#60a5fa"
-        />
-        <StatCard
-          icon={Activity}
-          label="Neo4j Nodes"
-          value={stats.neo4j.nodes}
-          sub={`${stats.neo4j.relationships} relationships`}
-          accent="#f59e0b"
+          icon={Database}
+          label="สถานะ Neo4j"
+          value={stats.neo4j.connected ? "🟢 เชื่อมต่อแล้ว" : "🔴 ขัดข้อง"}
+          sub="สถานะการเชื่อมต่อฐานข้อมูลกราฟ"
+          accent={stats.neo4j.connected ? "#10b981" : "#ef4444"}
         />
       </div>
 
+      {/* Quick Actions */}
+      <div className="grid grid-cols-3 gap-3 mb-8">
+        <Link href="/admin/users"
+          className="bg-white border border-gray-200 rounded-2xl p-5 flex items-center gap-3 hover:shadow-md hover:border-violet-200 transition group">
+          <div className="w-10 h-10 rounded-xl bg-violet-50 flex items-center justify-center group-hover:bg-violet-100 transition">
+            <Users size={18} className="text-violet-600" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-gray-800">จัดการผู้ใช้</p>
+            <p className="text-xs text-gray-400">{stats.total_users} บัญชี</p>
+          </div>
+        </Link>
+        <Link href="/admin/posts"
+          className="bg-white border border-gray-200 rounded-2xl p-5 flex items-center gap-3 hover:shadow-md hover:border-violet-200 transition group">
+          <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center group-hover:bg-emerald-100 transition">
+            <FileText size={18} className="text-emerald-600" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-gray-800">จัดการโพสต์</p>
+            <p className="text-xs text-gray-400">ข่าวสาร &amp; ประกาศ</p>
+          </div>
+        </Link>
+        <Link href="/admin/neo4j"
+          className="bg-white border border-gray-200 rounded-2xl p-5 flex items-center gap-3 hover:shadow-md hover:border-violet-200 transition group">
+          <div className="w-10 h-10 rounded-xl bg-sky-50 flex items-center justify-center group-hover:bg-sky-100 transition">
+            <Database size={18} className="text-sky-600" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-gray-800">Neo4j Tools</p>
+            <p className="text-xs text-gray-400">{stats.neo4j.connected ? "🟢 เชื่อมต่อ" : "🔴 ขัดข้อง"}</p>
+          </div>
+        </Link>
+      </div>
+
       <div className="grid lg:grid-cols-3 gap-6">
-        {/* Role Distribution */}
-        <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-6">
-          <div className="flex items-center gap-2 mb-5">
-            <TrendingUp size={16} className="text-violet-400" />
-            <h2 className="text-sm font-semibold text-slate-200 uppercase tracking-wider">
-              สัดส่วน Role
-            </h2>
-          </div>
-          <div className="flex flex-col gap-4">
-            <RolePill role="ALUMNI" count={stats.role_counts.ALUMNI} total={stats.total_users} />
-            <RolePill role="STUDENT" count={stats.role_counts.STUDENT} total={stats.total_users} />
-            <RolePill role="ADMIN" count={stats.role_counts.ADMIN} total={stats.total_users} />
-          </div>
-        </div>
 
         {/* Top Faculty */}
-        <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-6">
+        <div className="bg-white border border-gray-200 shadow-sm rounded-2xl p-6">
           <div className="flex items-center gap-2 mb-5">
-            <GitBranch size={16} className="text-blue-400" />
-            <h2 className="text-sm font-semibold text-slate-200 uppercase tracking-wider">
-              Top Faculty
+            <GitBranch size={16} className="text-blue-500" />
+            <h2 className="text-sm font-semibold text-gray-800 tracking-wider">
+              คณะ
             </h2>
           </div>
           {stats.faculty_stats.length === 0 ? (
-            <p className="text-slate-600 text-sm text-center py-6">ยังไม่มีข้อมูล</p>
+            <p className="text-gray-400 text-sm text-center py-6">ยังไม่มีข้อมูล</p>
           ) : (
             <div className="flex flex-col gap-3">
-              {stats.faculty_stats.map((f, i) => (
-                <div key={f.faculty} className="flex items-center gap-3">
-                  <span className="w-5 h-5 rounded-full bg-slate-800 text-slate-500
-                                   flex items-center justify-center text-xs font-bold flex-shrink-0">
-                    {i + 1}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-slate-300 truncate">{f.faculty}</p>
+              {stats.faculty_stats.map((f, i) => {
+                const maxVal = stats.faculty_stats[0]?.count || 1;
+                const pct = Math.round((f.count / maxVal) * 100);
+                return (
+                  <div key={f.faculty} className="relative flex items-center gap-3 p-2 rounded-lg overflow-hidden group">
+                    <div 
+                      className="absolute left-0 top-0 h-full bg-blue-100 border-r-2 border-blue-200 transition-all duration-700 ease-out z-0"
+                      style={{ width: `${pct}%` }}
+                    />
+                    <span className="relative z-10 w-5 h-5 rounded-full bg-white border border-blue-100 text-gray-500
+                                     flex items-center justify-center text-xs font-bold flex-shrink-0 shadow-sm">
+                      {i + 1}
+                    </span>
+                    <div className="relative z-10 flex-1 min-w-0">
+                      <p className="text-sm text-gray-800 font-medium truncate">{f.faculty}</p>
+                    </div>
+                    <span className="relative z-10 text-sm font-bold text-blue-600 flex-shrink-0">
+                      {f.count}
+                    </span>
                   </div>
-                  <span className="text-sm font-semibold text-violet-400 flex-shrink-0">
-                    {f.count}
-                  </span>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
 
-        {/* Neo4j Status */}
-        <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-6">
+        {/* Top Department */}
+        <div className="bg-white border border-gray-200 shadow-sm rounded-2xl p-6">
           <div className="flex items-center gap-2 mb-5">
-            <Database size={16} className="text-amber-400" />
-            <h2 className="text-sm font-semibold text-slate-200 uppercase tracking-wider">
-              Neo4j Status
+            <GraduationCap size={16} className="text-pink-500" />
+            <h2 className="text-sm font-semibold text-gray-800 tracking-wider">
+              สาขา
             </h2>
           </div>
-          <div className="flex items-center gap-2 mb-5">
-            <div className={`w-2.5 h-2.5 rounded-full ${stats.neo4j.connected ? "bg-green-400" : "bg-red-400"}`} />
-            <span className={`text-sm font-medium ${stats.neo4j.connected ? "text-green-400" : "text-red-400"}`}>
-              {stats.neo4j.connected ? "เชื่อมต่อแล้ว" : "เชื่อมต่อไม่ได้"}
-            </span>
-          </div>
-          {stats.neo4j.connected && (
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-slate-800/50 rounded-xl p-3 text-center">
-                <p className="text-xl font-bold text-white">{stats.neo4j.nodes}</p>
-                <p className="text-xs text-slate-400 mt-0.5">Nodes</p>
-              </div>
-              <div className="bg-slate-800/50 rounded-xl p-3 text-center">
-                <p className="text-xl font-bold text-white">{stats.neo4j.relationships}</p>
-                <p className="text-xs text-slate-400 mt-0.5">Relationships</p>
-              </div>
+          {(!stats.department_stats || stats.department_stats.length === 0) ? (
+            <p className="text-gray-400 text-sm text-center py-6">ยังไม่มีข้อมูล</p>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {stats.department_stats.map((d, i) => {
+                const maxVal = stats.department_stats[0]?.count || 1;
+                const pct = Math.round((d.count / maxVal) * 100);
+                return (
+                  <div key={d.department} className="relative flex items-center gap-3 p-2 rounded-lg overflow-hidden group">
+                    <div 
+                      className="absolute left-0 top-0 h-full bg-pink-100 border-r-2 border-pink-200 transition-all duration-700 ease-out z-0"
+                      style={{ width: `${pct}%` }}
+                    />
+                    <span className="relative z-10 w-5 h-5 rounded-full bg-white border border-pink-100 text-gray-500
+                                     flex items-center justify-center text-xs font-bold flex-shrink-0 shadow-sm">
+                      {i + 1}
+                    </span>
+                    <div className="relative z-10 flex-1 min-w-0">
+                      <p className="text-sm text-gray-800 font-medium truncate">{d.department}</p>
+                    </div>
+                    <span className="relative z-10 text-sm font-bold text-pink-600 flex-shrink-0">
+                      {d.count}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
+
+        {/* Generation Stats */}
+        <div className="bg-white border border-gray-200 shadow-sm rounded-2xl p-6">
+          <div className="flex items-center gap-2 mb-5">
+            <Users size={16} className="text-emerald-500" />
+            <h2 className="text-sm font-semibold text-gray-800 tracking-wider">
+              รุ่น
+            </h2>
+          </div>
+          {(!stats.generation_stats || stats.generation_stats.length === 0) ? (
+            <p className="text-gray-400 text-sm text-center py-6">ยังไม่มีข้อมูล</p>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {stats.generation_stats.map((g, i) => {
+                const maxVal = stats.generation_stats[0]?.count || 1;
+                const pct = Math.round((g.count / maxVal) * 100);
+                return (
+                  <div key={g.generation} className="relative flex items-center gap-3 p-2 rounded-lg overflow-hidden group">
+                    <div 
+                      className="absolute left-0 top-0 h-full bg-emerald-100 border-r-2 border-emerald-200 transition-all duration-700 ease-out z-0"
+                      style={{ width: `${pct}%` }}
+                    />
+                    <span className="relative z-10 w-5 h-5 rounded-full bg-white border border-emerald-100 text-gray-500
+                                     flex items-center justify-center text-xs font-bold flex-shrink-0 shadow-sm">
+                      {i + 1}
+                    </span>
+                    <div className="relative z-10 flex-1 min-w-0">
+                      <p className="text-sm text-gray-800 font-medium truncate">รุ่น {g.generation}</p>
+                    </div>
+                    <span className="relative z-10 text-sm font-bold text-emerald-600 flex-shrink-0">
+                      {g.count}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
       </div>
     </div>
   );

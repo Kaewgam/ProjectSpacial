@@ -1,188 +1,112 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import api from "@/lib/api";
+import { useAuth } from "@/contexts/AuthContext";
+import { X, Pencil } from "lucide-react";
 
 // ─── Types ───────────────────────────────────────────
-interface NewsItem {
-  id: number;
-  category: "ประกาศ" | "กิจกรรม" | "ข่าวสาร" | "โอกาสงาน";
-  title: string;
-  excerpt: string;
-  date: string;
-  author: string;
-  pinned?: boolean;
-  tag?: string;
+interface Post {
+  id:          string;
+  category:    "ประกาศ" | "กิจกรรม" | "ข่าวสาร" | "ประกาศสมัครงาน";
+  title:       string;
+  excerpt:     string;
+  content:     string;
+  created_at:  string;
+  author:      string;
+  pinned:      boolean;
+  is_active?:  boolean;
+  cover_image: string | null;
 }
 
-// ─── Mock Data ────────────────────────────────────────
-const NEWS_DATA: NewsItem[] = [
-  {
-    id: 1,
-    category: "ประกาศ",
-    title: "ขอเชิญศิษย์เก่าร่วมงานคืนสู่เหย้า ประจำปี 2569",
-    excerpt:
-      "คณะวิทยาศาสตร์และเทคโนโลยีขอเชิญศิษย์เก่าทุกรุ่นร่วมงานคืนสู่เหย้า เพื่อพบปะและแลกเปลี่ยนประสบการณ์ร่วมกัน",
-    date: "25 เม.ย. 2569",
-    author: "ฝ่ายกิจการศิษย์เก่า",
-    pinned: true,
-    tag: "ด่วน",
-  },
-  {
-    id: 2,
-    category: "กิจกรรม",
-    title: "Workshop: AI & Machine Learning สำหรับศิษย์เก่า",
-    excerpt:
-      "เวิร์คช็อปพิเศษสำหรับศิษย์เก่า เรียนรู้การประยุกต์ใช้ AI และ Machine Learning ในการทำงานจริง วิทยากรโดยศิษย์เก่ารุ่นพี่",
-    date: "20 เม.ย. 2569",
-    author: "ชมรมศิษย์เก่า IT",
-    pinned: true,
-  },
-  {
-    id: 3,
-    category: "โอกาสงาน",
-    title: "บริษัท TechCorp Thailand เปิดรับสมัครศิษย์เก่า 5 อัตรา",
-    excerpt:
-      "TechCorp Thailand กำลังมองหาศิษย์เก่าสาขาวิทยาการคอมพิวเตอร์และวิศวกรรมซอฟต์แวร์ เงินเดือนเริ่มต้น 35,000 บาท",
-    date: "18 เม.ย. 2569",
-    author: "ฝ่ายแนะแนวอาชีพ",
-  },
-  {
-    id: 4,
-    category: "ข่าวสาร",
-    title: "ศิษย์เก่าคว้ารางวัล Young Entrepreneur Award 2569",
-    excerpt:
-      "ขอแสดงความยินดีกับคุณ ธนพล สุขสมบูรณ์ ศิษย์เก่ารุ่นที่ 15 ที่ได้รับรางวัล Young Entrepreneur Award จากหอการค้าไทย",
-    date: "15 เม.ย. 2569",
-    author: "ฝ่ายประชาสัมพันธ์",
-  },
-  {
-    id: 5,
-    category: "กิจกรรม",
-    title: "กีฬาสีศิษย์เก่าสัมพันธ์ ครั้งที่ 7",
-    excerpt:
-      "ขอเชิญชวนศิษย์เก่าทุกรุ่นเข้าร่วมการแข่งขันกีฬาสีศิษย์เก่าสัมพันธ์ รับสมัครทีมได้ตั้งแต่วันนี้ถึง 30 เมษายน 2569",
-    date: "12 เม.ย. 2569",
-    author: "ชมรมกีฬาศิษย์เก่า",
-  },
-  {
-    id: 6,
-    category: "ประกาศ",
-    title: "อัปเดตข้อมูลศิษย์เก่าประจำปีการศึกษา 2569",
-    excerpt:
-      "ขอความร่วมมือศิษย์เก่าทุกท่านอัปเดตข้อมูลส่วนตัวในระบบให้เป็นปัจจุบัน เพื่อประโยชน์ในการติดต่อประสานงาน",
-    date: "10 เม.ย. 2569",
-    author: "ฝ่ายทะเบียนศิษย์เก่า",
-  },
-];
-
-const CATEGORY_STYLES: Record<
-  NewsItem["category"],
-  { bg: string; text: string; border: string; dot: string }
-> = {
-  ประกาศ:   { bg: "bg-violet-50",  text: "text-violet-700",  border: "border-violet-200", dot: "#7c3aed" },
+const CATEGORY_STYLES: Record<Post["category"], { bg: string; text: string; border: string; dot: string }> = {
+  ประกาศ:   { bg: "bg-violet-50",  text: "text-violet-700",  border: "border-violet-200",  dot: "#7c3aed" },
   กิจกรรม:  { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200", dot: "#059669" },
-  ข่าวสาร:  { bg: "bg-sky-50",     text: "text-sky-700",     border: "border-sky-200",    dot: "#0284c7" },
-  โอกาสงาน: { bg: "bg-amber-50",   text: "text-amber-700",   border: "border-amber-200",  dot: "#d97706" },
+  ข่าวสาร:  { bg: "bg-sky-50",     text: "text-sky-700",     border: "border-sky-200",     dot: "#0284c7" },
+  ประกาศสมัครงาน: { bg: "bg-amber-50",   text: "text-amber-700",   border: "border-amber-200",   dot: "#d97706" },
 };
 
-const ALL_CATEGORIES = ["ทั้งหมด", "ประกาศ", "กิจกรรม", "ข่าวสาร", "โอกาสงาน"] as const;
+const ALL_CATEGORIES = ["ทั้งหมด", "ประกาศ", "กิจกรรม", "ข่าวสาร", "ประกาศสมัครงาน"] as const;
 
 // ─── Sub Components ───────────────────────────────────
-function StatCard({
-  icon,
-  label,
-  value,
-  accent,
-}: {
-  icon: string;
-  label: string;
-  value: string;
-  accent: string;
-}) {
+function PinnedCard({ item, onClick }: { item: Post; onClick: () => void }) {
+  const style = CATEGORY_STYLES[item.category] || { bg: "bg-gray-50", text: "text-gray-700", border: "border-gray-200", dot: "#6b7280" };
   return (
-    <div
-      className="bg-white rounded-2xl px-6 py-5 flex items-center gap-4 shadow-sm border border-gray-100 hover:shadow-md transition-shadow"
+    <div 
+      onClick={onClick}
+      className="bg-white border border-gray-200 rounded-2xl p-6 hover:shadow-md hover:border-violet-200 transition-all group cursor-pointer relative overflow-hidden"
     >
-      <div
-        className="w-11 h-11 rounded-xl flex items-center justify-center text-2xl flex-shrink-0"
-        style={{ background: `${accent}18` }}
-      >
-        {icon}
+      <div className="absolute top-0 left-0 right-0 h-1 rounded-t-2xl" style={{ background: style.dot }} />
+      {item.cover_image && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={item.cover_image} alt={item.title} className="w-full h-36 object-cover rounded-xl mb-4" />
+      )}
+      <div className="absolute top-4 right-4 flex flex-col items-end gap-1">
+        {item.is_active === false && (
+          <div className="bg-red-100 text-red-600 rounded-full px-2.5 py-1 shadow-sm border border-red-200">
+            <span className="text-[10px] font-bold flex items-center gap-1">👁️ ซ่อนอยู่</span>
+          </div>
+        )}
+        <div className="bg-gray-100 rounded-full px-2.5 py-1 shadow-sm">
+          <span className="text-[10px] text-gray-500 font-semibold">📌 ปักหมุด</span>
+        </div>
       </div>
-      <div>
-        <p className="text-2xl font-bold text-gray-800">{value}</p>
-        <p className="text-xs text-gray-400 mt-0.5">{label}</p>
-      </div>
-    </div>
-  );
-}
-
-function PinnedCard({ item }: { item: NewsItem }) {
-  const style = CATEGORY_STYLES[item.category];
-  return (
-    <div className="bg-white border border-gray-200 rounded-2xl p-6 hover:shadow-md hover:border-violet-200 transition-all group cursor-pointer relative overflow-hidden">
-      {/* Top accent bar */}
-      <div
-        className="absolute top-0 left-0 right-0 h-1 rounded-t-2xl"
-        style={{ background: style.dot }}
-      />
-
-      {/* Pinned badge */}
-      <div className="absolute top-4 right-4 flex items-center gap-1 bg-gray-100 rounded-full px-2.5 py-1">
-        <span className="text-[10px] text-gray-500 font-semibold">📌 ปักหมุด</span>
-      </div>
-
-      {/* Category */}
       <div className="flex items-center gap-2 mb-3 mt-2">
         <div className="w-2 h-2 rounded-full" style={{ background: style.dot }} />
         <span className={`text-xs font-semibold ${style.text} ${style.bg} border ${style.border} px-2 py-0.5 rounded-full`}>
           {item.category}
         </span>
-        {item.tag && (
-          <span className="text-xs font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-full border border-red-200">
-            {item.tag}
-          </span>
-        )}
       </div>
-
       <h3 className="text-gray-800 font-semibold text-base leading-snug mb-2 group-hover:text-violet-700 transition-colors line-clamp-2">
         {item.title}
       </h3>
-      <p className="text-gray-500 text-sm leading-relaxed line-clamp-2 mb-4">{item.excerpt}</p>
-
+      <p className="text-gray-500 text-sm leading-relaxed line-clamp-2 mb-4">{item.excerpt || item.content.slice(0, 100)}</p>
       <div className="flex items-center justify-between border-t border-gray-100 pt-3">
         <div className="flex items-center gap-2">
-          <div className="w-5 h-5 rounded-full bg-gray-200 flex items-center justify-center text-[10px]">
-            👤
-          </div>
-          <span className="text-xs text-gray-400">{item.author}</span>
+          <div className="w-5 h-5 rounded-full bg-gray-200 flex items-center justify-center text-[10px]">👤</div>
+          <span className="text-xs text-gray-400">{item.author || "Admin"}</span>
         </div>
-        <span className="text-xs text-gray-400">{item.date}</span>
+        <span className="text-xs text-gray-400">{item.created_at}</span>
       </div>
     </div>
   );
 }
 
-function NewsCard({ item }: { item: NewsItem }) {
-  const style = CATEGORY_STYLES[item.category];
+function NewsCard({ item, onClick }: { item: Post; onClick: () => void }) {
+  const style = CATEGORY_STYLES[item.category] || { bg: "bg-gray-50", text: "text-gray-700", border: "border-gray-200", dot: "#6b7280" };
   return (
-    <div className="bg-white border border-gray-100 rounded-xl p-5 hover:shadow-md hover:border-gray-200 transition-all group cursor-pointer">
-      <div className="flex items-center gap-2 mb-3">
-        <div className="w-2 h-2 rounded-full" style={{ background: style.dot }} />
-        <span className={`text-xs font-semibold ${style.text} ${style.bg} border ${style.border} px-2 py-0.5 rounded-full`}>
-          {item.category}
-        </span>
-      </div>
-
-      <h3 className="text-gray-800 font-medium text-sm leading-snug mb-2 group-hover:text-violet-700 transition-colors line-clamp-2">
-        {item.title}
-      </h3>
-      <p className="text-gray-400 text-xs leading-relaxed line-clamp-2 mb-3">{item.excerpt}</p>
-
-      <div className="flex items-center justify-between border-t border-gray-50 pt-3">
-        <span className="text-xs text-gray-400">{item.author}</span>
-        <span className="text-xs text-gray-400">{item.date}</span>
+    <div 
+      onClick={onClick}
+      className="bg-white border border-gray-100 rounded-xl overflow-hidden hover:shadow-md hover:border-gray-200 transition-all group cursor-pointer"
+    >
+      {item.cover_image && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={item.cover_image} alt={item.title} className="w-full h-36 object-cover" />
+      )}
+      <div className="p-5">
+        <div className="flex items-center gap-2 mb-3">
+          <div className="w-2 h-2 rounded-full" style={{ background: style.dot }} />
+          <span className={`text-xs font-semibold ${style.text} ${style.bg} border ${style.border} px-2 py-0.5 rounded-full`}>
+            {item.category}
+          </span>
+          {item.is_active === false && (
+            <span className="text-[10px] font-bold bg-red-100 text-red-600 px-2 py-0.5 rounded-full border border-red-200 ml-auto">
+              👁️ ซ่อนอยู่
+            </span>
+          )}
+        </div>
+        <h3 className="text-gray-800 font-medium text-sm leading-snug mb-2 group-hover:text-violet-700 transition-colors line-clamp-2">
+          {item.title}
+        </h3>
+        <p className="text-gray-400 text-xs leading-relaxed line-clamp-2 mb-3">
+          {item.excerpt || item.content.slice(0, 80)}
+        </p>
+        <div className="flex items-center justify-between border-t border-gray-50 pt-3">
+          <span className="text-xs text-gray-400">{item.author || "Admin"}</span>
+          <span className="text-xs text-gray-400">{item.created_at}</span>
+        </div>
       </div>
     </div>
   );
@@ -190,13 +114,62 @@ function NewsCard({ item }: { item: NewsItem }) {
 
 // ─── Main Page ────────────────────────────────────────
 export default function Home() {
-  const [activeCategory, setActiveCategory] = useState<string>("ทั้งหมด");
+  const { user } = useAuth();
+  const isAdmin  = user?.role === "ADMIN";
+  const searchParams = useSearchParams();
 
-  const pinned = NEWS_DATA.filter((n) => n.pinned);
-  const filtered =
-    activeCategory === "ทั้งหมด"
-      ? NEWS_DATA.filter((n) => !n.pinned)
-      : NEWS_DATA.filter((n) => !n.pinned && n.category === activeCategory);
+  const [activeCategory, setActiveCategory] = useState<string>("ทั้งหมด");
+  const [pinned,   setPinned]   = useState<Post[]>([]);
+  const [posts,    setPosts]    = useState<Post[]>([]);
+  const [loading,  setLoading]  = useState(true);
+  const [page,     setPage]     = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [selectedPost, setSelectedPost] = useState<Post | null>(null);
+
+  // ── ดึงโพสต์ปักหมุด (แยก request) ──
+  const fetchPinned = useCallback(async () => {
+    try {
+      const res = await api.get("/api/posts/?pinned=1&limit=4");
+      setPinned(res.data.results || []);
+    } catch { setPinned([]); }
+  }, []);
+
+  // ── ดึงโพสต์ทั่วไป ──
+  const fetchPosts = useCallback(async (cat: string, p: number) => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({ pinned: "0", page: String(p), limit: "9" });
+      if (cat !== "ทั้งหมด") params.set("category", cat);
+      const res = await api.get(`/api/posts/?${params}`);
+      setPosts(res.data.results || []);
+      setTotalPages(res.data.total_pages || 1);
+    } catch { setPosts([]); }
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { fetchPinned(); }, [fetchPinned]);
+
+  // อ่าน ?cat= จาก URL (จากการคลิก Navbar)
+  useEffect(() => {
+    const cat = searchParams.get("cat");
+    const valid = ["ประกาศ", "กิจกรรม", "ข่าวสาร", "ประกาศสมัครงาน"];
+    if (cat && valid.includes(cat)) {
+      setActiveCategory(cat);
+    } else {
+      setActiveCategory("ทั้งหมด");
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    setPage(1);
+    fetchPosts(activeCategory, 1);
+  }, [activeCategory, fetchPosts]);
+
+  const handlePageChange = (p: number) => {
+    setPage(p);
+    fetchPosts(activeCategory, p);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900">
@@ -205,32 +178,26 @@ export default function Home() {
       <div className="bg-white border-b border-gray-200 shadow-sm">
         <div className="max-w-6xl mx-auto px-8 py-10 flex flex-col md:flex-row items-center justify-between gap-6">
           <div>
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-xs text-gray-400">อัปเดตล่าสุด 25 เม.ย. 2569</span>
-            </div>
             <h1 className="text-3xl md:text-4xl font-bold text-gray-800 mb-2 leading-tight">
               ข่าวสาร &amp; ประกาศ
             </h1>
             <p className="text-gray-500 text-sm max-w-lg">
-              ติดตามข่าวสาร กิจกรรม โอกาสงาน และประกาศต่างๆ สำหรับศิษย์เก่า
+              ติดตามข่าวสาร กิจกรรม ประกาศสมัครงาน และประกาศต่างๆ สำหรับศิษย์เก่า
             </p>
           </div>
-
-          {/* Create Post Button */}
-          <div className="flex gap-3 flex-wrap">
+          {/* ── ปุ่มสร้างโพสต์: เฉพาะ Admin ── */}
+          {isAdmin && (
             <Link
               href="/create-post"
               className="flex items-center gap-2 bg-violet-600 hover:bg-violet-700 active:scale-95 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-all shadow-sm"
             >
               ✏️ สร้างโพสต์
             </Link>
-          </div>
+          )}
         </div>
       </div>
 
       <div className="max-w-6xl mx-auto px-8 py-8">
-
 
         {/* ─── Pinned Section ─── */}
         {pinned.length > 0 && (
@@ -241,7 +208,7 @@ export default function Home() {
             </div>
             <div className="grid md:grid-cols-2 gap-4">
               {pinned.map((item) => (
-                <PinnedCard key={item.id} item={item} />
+                <PinnedCard key={item.id} item={item} onClick={() => setSelectedPost(item)} />
               ))}
             </div>
           </div>
@@ -271,19 +238,139 @@ export default function Home() {
             ))}
           </div>
 
-          {/* Cards Grid */}
-          {filtered.length > 0 ? (
+          {/* Posts Grid */}
+          {loading ? (
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filtered.map((item) => (
-                <NewsCard key={item.id} item={item} />
+              {[...Array(6)].map((_, i) => (
+                <div key={i} className="bg-white rounded-xl border border-gray-100 h-52 animate-pulse" />
+              ))}
+            </div>
+          ) : posts.length > 0 ? (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {posts.map((item) => (
+                <NewsCard key={item.id} item={item} onClick={() => setSelectedPost(item)} />
               ))}
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-16 text-gray-400">
               <div className="text-4xl mb-3">📭</div>
               <p className="text-sm">ไม่มีข่าวสารในหมวดหมู่นี้</p>
+              {isAdmin && (
+                <Link href="/create-post" className="mt-4 text-sm text-violet-600 hover:underline">
+                  + สร้างโพสต์แรก
+                </Link>
+              )}
             </div>
           )}
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex justify-center gap-2 mt-8">
+              {[...Array(totalPages)].map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => handlePageChange(i + 1)}
+                  className={`w-9 h-9 rounded-full text-sm font-medium transition-all ${
+                    page === i + 1
+                      ? "bg-violet-600 text-white shadow-sm"
+                      : "bg-white border border-gray-200 text-gray-500 hover:border-violet-300"
+                  }`}
+                >
+                  {i + 1}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ─── Post Modal ─── */}
+      {selectedPost && (
+        <PostModal post={selectedPost} isAdmin={isAdmin} onClose={() => setSelectedPost(null)} />
+      )}
+    </div>
+  );
+}
+
+// ─── Modal Component ───────────────────────────────────
+function PostModal({ post, isAdmin, onClose }: { post: Post; isAdmin?: boolean; onClose: () => void }) {
+  const style = CATEGORY_STYLES[post.category] || { bg: "bg-gray-50", text: "text-gray-700", border: "border-gray-200", dot: "#6b7280" };
+  
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = "unset"; };
+  }, []);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white w-full max-w-3xl max-h-[90vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+        
+        {/* Header/Image Area */}
+        <div className="relative flex-shrink-0">
+          {post.cover_image ? (
+            <div className="w-full h-64 sm:h-80 bg-gray-100">
+              <img src={post.cover_image} alt={post.title} className="w-full h-full object-cover" />
+            </div>
+          ) : (
+            <div className="w-full h-16 bg-gray-50 border-b border-gray-100" />
+          )}
+          
+          <div className="absolute top-4 right-4 flex gap-2">
+            {isAdmin && (
+              <Link 
+                href={`/edit-post/${post.id}`}
+                className="p-2 bg-black/40 hover:bg-black/60 text-white rounded-full backdrop-blur-md transition-colors shadow-sm"
+              >
+                <Pencil size={20} />
+              </Link>
+            )}
+            <button 
+              onClick={onClose}
+              className="p-2 bg-black/40 hover:bg-black/60 text-white rounded-full backdrop-blur-md transition-colors shadow-sm"
+            >
+              <X size={20} />
+            </button>
+          </div>
+        </div>
+
+        {/* Content Area */}
+        <div className="flex-1 overflow-y-auto p-6 sm:p-8">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-2.5 h-2.5 rounded-full" style={{ background: style.dot }} />
+            <span className={`text-xs font-bold ${style.text} ${style.bg} border ${style.border} px-2.5 py-1 rounded-full`}>
+              {post.category}
+            </span>
+            {post.is_active === false && (
+               <span className="text-xs font-bold bg-red-100 text-red-600 px-2.5 py-1 rounded-full border border-red-200">
+                 👁️ ถูกซ่อนไว้
+               </span>
+            )}
+            <span className="text-sm text-gray-500 ml-auto flex items-center gap-1.5">
+               🕒 {post.created_at}
+            </span>
+          </div>
+          
+          <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-6 leading-snug">
+            {post.title}
+          </h2>
+
+          <div className="text-gray-700 whitespace-pre-wrap leading-relaxed text-[15px]">
+            {post.content}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex-shrink-0 bg-gray-50 border-t border-gray-100 p-4 sm:px-8 sm:py-5 flex items-center justify-between">
+           <div className="flex items-center gap-3">
+             <div className="w-10 h-10 rounded-full bg-violet-100 flex items-center justify-center text-violet-600 text-lg">
+               👤
+             </div>
+             <div>
+               <p className="text-sm font-bold text-gray-800">{post.author || "Admin"}</p>
+               <p className="text-xs text-gray-500">ผู้โพสต์</p>
+             </div>
+           </div>
         </div>
       </div>
     </div>

@@ -1,11 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import {
   ChevronLeft, ImagePlus, X,
-  AlignLeft, Tag, User, FileText, Send,
+  AlignLeft, Tag, User, FileText, Send, Trash2
 } from "lucide-react";
 import api from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
@@ -36,20 +36,27 @@ function Label({ icon, text, required }: { icon: React.ReactNode; text: string; 
   );
 }
 
-// ─── Main Page ────────────────────────────────────────
-export default function CreatePostPage() {
+export default function EditPostPage() {
   const router  = useRouter();
+  const params  = useParams();
+  const id      = params.id as string;
   const { user, loading: authLoading } = useAuth();
 
+  const [loadingInitial, setLoadingInitial] = useState(true);
+  
   const [title, setTitle]       = useState("");
   const [category, setCategory] = useState<Category | "">("");
   const [excerpt, setExcerpt]   = useState("");
   const [content, setContent]   = useState("");
   const [author, setAuthor]     = useState("");
   const [pinned, setPinned]     = useState(false);
+  const [is_active, setIsActive] = useState(true);
+  
   const [coverImage, setCoverImage] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  
   const [submitting, setSubmitting] = useState(false);
+  const [deleting, setDeleting]     = useState(false);
   const [submitted, setSubmitted]   = useState(false);
   const [error, setError]           = useState("");
 
@@ -60,12 +67,31 @@ export default function CreatePostPage() {
     }
   }, [user, authLoading, router]);
 
-  // ── ตั้งชื่อผู้โพสต์อัตโนมัติ ──
+  // ── Load Initial Data ──
   useEffect(() => {
-    if (user && !author) {
-      setAuthor(`${user.first_name} ${user.last_name}`.trim() || user.student_id);
-    }
-  }, [user]);
+    if (!id || authLoading) return;
+    
+    api.get(`/api/posts/${id}/`)
+      .then(res => {
+        const p = res.data;
+        setTitle(p.title || "");
+        setCategory((p.category as Category) || "");
+        setExcerpt(p.excerpt || "");
+        setContent(p.content || "");
+        setAuthor(p.author || "");
+        setPinned(p.pinned || false);
+        setIsActive(p.is_active ?? true);
+        if (p.cover_image) {
+           setPreviewUrl(p.cover_image);
+        }
+      })
+      .catch(err => {
+         setError("ไม่พบโพสต์ที่ต้องการแก้ไข หรือมีข้อผิดพลาด");
+      })
+      .finally(() => {
+         setLoadingInitial(false);
+      });
+  }, [id, authLoading]);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -76,11 +102,14 @@ export default function CreatePostPage() {
     setError("");
   };
 
-  const removeImage = () => { setCoverImage(null); setPreviewUrl(null); };
+  const removeImage = () => { 
+    setCoverImage(null); 
+    setPreviewUrl(null); 
+  };
 
   const isValid = title.trim().length > 0 && category !== "" && content.trim().length > 0;
 
-  // ── Submit → POST /api/posts/ ──
+  // ── Submit → PATCH /api/posts/<id>/ ──
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isValid) return;
@@ -95,9 +124,13 @@ export default function CreatePostPage() {
       formData.append("category", category);
       formData.append("author",   author.trim());
       formData.append("pinned",   String(pinned));
-      if (coverImage) formData.append("cover_image", coverImage);
+      formData.append("is_active", String(is_active));
+      
+      if (coverImage) {
+        formData.append("cover_image", coverImage);
+      }
 
-      await api.post("/api/posts/", formData, {
+      await api.patch(`/api/posts/${id}/`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
 
@@ -113,8 +146,21 @@ export default function CreatePostPage() {
     }
   };
 
+  // ── Delete → DELETE /api/posts/<id>/ ──
+  const handleDelete = async () => {
+    if (!confirm("คุณแน่ใจหรือไม่ว่าต้องการลบโพสต์นี้? การดำเนินการนี้ไม่สามารถย้อนกลับได้")) return;
+    setDeleting(true);
+    try {
+      await api.delete(`/api/posts/${id}/`);
+      router.push("/");
+    } catch (err: any) {
+      setError("เกิดข้อผิดพลาดในการลบโพสต์");
+      setDeleting(false);
+    }
+  };
+
   // ─── Loading / Unauthorized ───────────────────────
-  if (authLoading) {
+  if (authLoading || loadingInitial) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="w-8 h-8 border-4 border-violet-200 border-t-violet-600 rounded-full animate-spin" />
@@ -130,7 +176,7 @@ export default function CreatePostPage() {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-12 text-center max-w-sm">
           <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">✅</div>
-          <h2 className="text-xl font-bold text-gray-800 mb-2">โพสต์สำเร็จ!</h2>
+          <h2 className="text-xl font-bold text-gray-800 mb-2">อัปเดตโพสต์สำเร็จ!</h2>
           <p className="text-sm text-gray-500">กำลังพาคุณกลับหน้าหลัก...</p>
         </div>
       </div>
@@ -146,18 +192,28 @@ export default function CreatePostPage() {
           <Link href="/" className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 transition-colors">
             <ChevronLeft size={18} /> กลับหน้าหลัก
           </Link>
-          <h1 className="text-base font-bold text-gray-800">✏️ สร้างโพสต์ใหม่</h1>
-          <button
-            form="post-form"
-            type="submit"
-            disabled={!isValid || submitting}
-            className="flex items-center gap-2 bg-violet-600 hover:bg-violet-700 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed text-white text-sm font-semibold px-5 py-2 rounded-xl transition-all active:scale-95 shadow-sm"
-          >
-            {submitting
-              ? <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-              : <Send size={14} />}
-            {submitting ? "กำลังโพสต์..." : "โพสต์"}
-          </button>
+          <h1 className="text-base font-bold text-gray-800">✏️ แก้ไขโพสต์</h1>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={submitting || deleting}
+              className="flex items-center gap-2 bg-red-50 hover:bg-red-100 text-red-600 text-sm font-semibold px-4 py-2 rounded-xl transition-all shadow-sm"
+            >
+               {deleting ? "กำลังลบ..." : <Trash2 size={16} />}
+            </button>
+            <button
+              form="post-form"
+              type="submit"
+              disabled={!isValid || submitting}
+              className="flex items-center gap-2 bg-violet-600 hover:bg-violet-700 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed text-white text-sm font-semibold px-5 py-2 rounded-xl transition-all active:scale-95 shadow-sm"
+            >
+              {submitting
+                ? <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                : <Send size={14} />}
+              {submitting ? "กำลังบันทึก..." : "บันทึกการแก้ไข"}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -239,7 +295,7 @@ export default function CreatePostPage() {
 
         {/* Cover Image */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-          <Label icon={<ImagePlus size={15} />} text="รูปภาพประกอบ" />
+          <Label icon={<ImagePlus size={15} />} text="รูปภาพประกอบ (อัปโหลดรูปใหม่จะแทนที่รูปเดิม)" />
           {previewUrl ? (
             <div className="relative rounded-xl overflow-hidden border border-gray-200">
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -286,24 +342,20 @@ export default function CreatePostPage() {
               <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${pinned ? "translate-x-6" : "translate-x-1"}`} />
             </button>
           </div>
+          <div className="flex items-center justify-between py-2 border-t border-gray-100">
+            <div>
+              <p className="text-sm font-semibold text-gray-700">👁️ สถานะการแสดงผล</p>
+              <p className="text-xs text-gray-400 mt-0.5">ปิดการใช้งานหากต้องการซ่อนโพสต์</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsActive((v) => !v)}
+              className={`relative w-11 h-6 rounded-full transition-colors ${is_active ? "bg-emerald-500" : "bg-gray-200"}`}
+            >
+              <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${is_active ? "translate-x-6" : "translate-x-1"}`} />
+            </button>
+          </div>
         </div>
-
-        {!isValid && (
-          <p className="text-xs text-gray-400 text-center">
-            กรุณากรอก <span className="text-red-400 font-medium">หมวดหมู่ • หัวข้อ • เนื้อหา</span> ก่อนโพสต์
-          </p>
-        )}
-
-        <button
-          type="submit"
-          disabled={!isValid || submitting}
-          className="w-full flex items-center justify-center gap-2 bg-violet-600 hover:bg-violet-700 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-xl transition-all active:scale-95 shadow-sm sm:hidden"
-        >
-          {submitting
-            ? <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-            : <Send size={16} />}
-          {submitting ? "กำลังโพสต์..." : "โพสต์"}
-        </button>
       </form>
     </div>
   );

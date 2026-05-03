@@ -22,13 +22,15 @@ from accounts.views import (
     test_protected, register, search_alumni,
     me_view, update_profile, upload_avatar,
     request_password_reset, confirm_password_reset, graph_page,
+    list_faculties, list_departments,
 )
 from accounts.views_graph import get_graph_data
 from accounts.views_admin import (
     admin_stats, admin_users_list, admin_user_detail,
     admin_neo4j_cleanup, admin_neo4j_syncall, admin_neo4j_status,
-    admin_create_user,
+    admin_create_user, admin_neo4j_audit,
 )
+from posts.views import post_list, post_detail
 
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
@@ -56,6 +58,14 @@ urlpatterns = [
     path('api/admin/neo4j/cleanup/', admin_neo4j_cleanup),
     path('api/admin/neo4j/sync-all/', admin_neo4j_syncall),
     path('api/admin/neo4j/status/', admin_neo4j_status),
+    path('api/admin/neo4j/audit/', admin_neo4j_audit),
+    # ── Post API ──
+    path('api/posts/', post_list),
+    path('api/posts/<uuid:post_id>/', post_detail),
+    # ── Faculty & Department API ──
+    path('api/faculties/', list_faculties),
+    path('api/departments/', list_departments),
+    path('api/', include('knowledge.urls')),
     path('', include('accounts.urls')),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 

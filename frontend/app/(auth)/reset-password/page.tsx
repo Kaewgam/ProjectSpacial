@@ -5,7 +5,8 @@ import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import toast, { Toaster } from "react-hot-toast";
 import { FaEye, FaEyeSlash, FaUserGraduate } from "react-icons/fa";
-import { CheckCircle, XCircle, ArrowLeft } from "lucide-react";
+import { CheckCircle, XCircle, ArrowLeft, Info } from "lucide-react";
+import api from "@/lib/api";
 
 function ResetPasswordForm() {
     const searchParams = useSearchParams();
@@ -26,18 +27,16 @@ function ResetPasswordForm() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (password.length < 8) { toast.error("รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร"); return; }
+        if (password.length <= 6) { toast.error("รหัสผ่านต้องมีความยาวมากกว่า 6 ตัวอักษร"); return; }
+        if (!/[A-Z]/.test(password)) { toast.error("รหัสผ่านต้องมีตัวอักษรพิมพ์ใหญ่อย่างน้อย 1 ตัว"); return; }
+        if (!/[0-9]/.test(password)) { toast.error("รหัสผ่านต้องมีตัวเลขอย่างน้อย 1 ตัว"); return; }
         if (password !== confirm) { toast.error("รหัสผ่านไม่ตรงกัน"); return; }
 
         setSubmitting(true);
         try {
-            const res = await fetch("http://127.0.0.1:8000/api/password-reset/confirm/", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ token, password }),
-            });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || "เกิดข้อผิดพลาด");
+            const res = await api.post("/api/password-reset/confirm/", { token, password });
+            const data = res.data;
+            if (res.status >= 400) throw new Error(data.error || "เกิดข้อผิดพลาด");
             setDone(true);
             setTimeout(() => router.push("/login"), 3000);
         } catch (err: any) {
@@ -100,13 +99,30 @@ function ResetPasswordForm() {
                                         type={showPass ? "text" : "password"}
                                         value={password}
                                         onChange={(e) => setPassword(e.target.value)}
-                                        placeholder="อย่างน้อย 8 ตัวอักษร"
+                                        placeholder="••••••••"
                                         className={`${inputClass} pr-12`}
                                     />
                                     <button type="button" onClick={() => setShowPass(!showPass)}
                                         className="absolute inset-y-0 right-0 px-4 flex items-center text-gray-500 hover:text-gray-700">
                                         {showPass ? <FaEyeSlash /> : <FaEye />}
                                     </button>
+                                </div>
+
+                                {/* Password Rules Checklist */}
+                                <div className="mt-3 space-y-1.5 p-3 bg-gray-50 rounded-lg border border-gray-100">
+                                    <p className="text-xs font-semibold text-gray-600 mb-2">รหัสผ่านต้องประกอบด้วย:</p>
+                                    <div className={`flex items-center gap-2 text-xs transition-colors ${password.length > 6 ? "text-emerald-600" : "text-gray-400"}`}>
+                                        {password.length > 6 ? <CheckCircle size={14} className="flex-shrink-0" /> : <Info size={14} className="flex-shrink-0" />}
+                                        <span>ตัวอักษรความยาวมากกว่า 6</span>
+                                    </div>
+                                    <div className={`flex items-center gap-2 text-xs transition-colors ${/[A-Z]/.test(password) ? "text-emerald-600" : "text-gray-400"}`}>
+                                        {/[A-Z]/.test(password) ? <CheckCircle size={14} className="flex-shrink-0" /> : <Info size={14} className="flex-shrink-0" />}
+                                        <span>ตัวอักษรพิมพ์ใหญ่อย่างน้อย 1 ตัว</span>
+                                    </div>
+                                    <div className={`flex items-center gap-2 text-xs transition-colors ${/[0-9]/.test(password) ? "text-emerald-600" : "text-gray-400"}`}>
+                                        {/[0-9]/.test(password) ? <CheckCircle size={14} className="flex-shrink-0" /> : <Info size={14} className="flex-shrink-0" />}
+                                        <span>ตัวเลขอย่างน้อย 1 ตัว</span>
+                                    </div>
                                 </div>
                             </div>
 

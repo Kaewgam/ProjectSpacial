@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import api from "@/lib/api";
 import {
   Search, ChevronLeft, ChevronRight, Shield, Trash2,
-  Ban, CheckCircle, X, UserPlus, Eye, EyeOff
+  Edit, CheckCircle, X, UserPlus, Eye, EyeOff, Info
 } from "lucide-react";
 
 // ─── Types ───────────────────────────────────────────
@@ -12,13 +12,14 @@ interface AdminUser {
   id: string;
   student_id: string;
   email: string;
-  role: "ALUMNI" | "STUDENT" | "ADMIN";
+  role: "ALUMNI" | "ADMIN";
   prefix: string;
   first_name: string;
   last_name: string;
   faculty: string;
   department: string;
   occupation: string;
+  company: string;
   is_active: boolean;
   date_joined: string;
   avatar: string | null;
@@ -42,44 +43,44 @@ interface CreateForm {
   faculty: string;
   department: string;
   occupation: string;
+  company: string;
 }
 
 const EMPTY_FORM: CreateForm = {
   student_id: "", email: "", password: "", role: "ALUMNI",
   prefix: "", first_name: "", last_name: "",
-  faculty: "", department: "", occupation: "",
+  faculty: "", department: "", occupation: "", company: "",
 };
 
 const ROLE_COLORS: Record<string, string> = {
-  ALUMNI: "bg-violet-500/15 text-violet-400",
-  STUDENT: "bg-blue-500/15 text-blue-400",
-  ADMIN: "bg-red-500/15 text-red-400",
+  ALUMNI: "bg-violet-100 text-violet-700 border border-violet-200",
+  ADMIN: "bg-rose-100 text-rose-700 border border-rose-200",
 };
 
 // ─── Field Component ──────────────────────────────────
 function Field({
   label, required, error, children,
 }: {
-  label: string;
+  label: React.ReactNode;
   required?: boolean;
   error?: string;
   children: React.ReactNode;
 }) {
   return (
     <div>
-      <label className="block text-xs font-medium text-slate-400 mb-1.5">
-        {label}{required && <span className="text-red-400 ml-1">*</span>}
+      <label className="flex items-center text-xs font-medium text-slate-700 mb-1.5">
+        {label}{required && <span className="text-red-500 ml-1">*</span>}
       </label>
       {children}
-      {error && <p className="text-xs text-red-400 mt-1">{error}</p>}
+      {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
     </div>
   );
 }
 
 const inputCls = (err?: string) =>
-  `w-full px-3 py-2 bg-slate-800 border rounded-lg text-sm text-white
-   placeholder-slate-500 focus:outline-none transition
-   ${err ? "border-red-500 focus:border-red-400" : "border-slate-700 focus:border-violet-500"}`;
+  `w-full px-3 py-2 bg-white border rounded-lg text-sm text-slate-900
+   placeholder-slate-400 focus:outline-none transition
+   ${err ? "border-red-500 focus:border-red-400 focus:ring-1 focus:ring-red-400" : "border-slate-300 focus:border-violet-500 focus:ring-1 focus:ring-violet-500"}`;
 
 // ─── Create User Modal ────────────────────────────────
 function CreateUserModal({
@@ -87,54 +88,65 @@ function CreateUserModal({
   onSuccess,
 }: {
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (msg?: string) => void;
 }) {
   const [form, setForm] = useState<CreateForm>(EMPTY_FORM);
   const [errors, setErrors] = useState<Partial<CreateForm>>({});
   const [loading, setLoading] = useState(false);
   const [showPass, setShowPass] = useState(false);
   const [neo4jWarn, setNeo4jWarn] = useState(false);
+  const [generalError, setGeneralError] = useState("");
 
   const set = (k: keyof CreateForm, v: string) => {
     setForm((f) => ({ ...f, [k]: v }));
     setErrors((e) => ({ ...e, [k]: "" }));
+    setGeneralError("");
   };
 
   const handleSubmit = async () => {
     setLoading(true);
     setErrors({});
+    setGeneralError("");
+
+
     try {
       const res = await api.post("/api/admin/users/create/", form);
-      if (!res.data.neo4j_synced) setNeo4jWarn(true);
-      onSuccess();
+      if (res.data.neo4j_synced === false) {
+        onSuccess("สร้างบัญชีสำเร็จ! 🎉 (⚠️ แต่ไม่ได้ซิงค์ไป Neo4j เนื่องจากไม่ได้เปิดใช้งาน)");
+      } else {
+        onSuccess("สร้างบัญชีสำเร็จ! 🎉");
+      }
       onClose();
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { errors?: Partial<CreateForm>; error?: string } } };
       const errs = axiosErr.response?.data?.errors;
+      const msg = axiosErr.response?.data?.error;
       if (errs) setErrors(errs as Partial<CreateForm>);
+      if (msg) setGeneralError(msg);
+      if (!errs && !msg) setGeneralError("เกิดข้อผิดพลาดจากเซิร์ฟเวอร์");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-      <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-2xl shadow-2xl
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+      <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-2xl shadow-xl
                       flex flex-col max-h-[90vh]">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-5 border-b border-slate-800">
+        <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-violet-500/20 flex items-center justify-center">
-              <UserPlus size={17} className="text-violet-400" />
+            <div className="w-9 h-9 rounded-xl bg-violet-100 flex items-center justify-center">
+              <UserPlus size={17} className="text-violet-600" />
             </div>
             <div>
-              <h2 className="text-base font-semibold text-white">สร้างบัญชีใหม่</h2>
+              <h2 className="text-base font-semibold text-slate-900">สร้างบัญชีใหม่</h2>
               <p className="text-xs text-slate-500">กรอกข้อมูลผู้ใช้ที่ต้องการสร้าง</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-lg text-slate-500 hover:text-white hover:bg-slate-800 transition"
+            className="p-2 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition"
           >
             <X size={18} />
           </button>
@@ -165,7 +177,6 @@ function CreateUserModal({
                   onChange={(e) => set("role", e.target.value)}
                 >
                   <option value="ALUMNI">ALUMNI — ศิษย์เก่า</option>
-                  <option value="STUDENT">STUDENT — นักศึกษา</option>
                   <option value="ADMIN">ADMIN — ผู้ดูแล</option>
                 </select>
               </Field>
@@ -180,14 +191,22 @@ function CreateUserModal({
                 />
               </Field>
 
-              <Field label="รหัสผ่าน" required error={errors.password}>
+              <Field
+                label={
+                  <span className="flex items-center gap-1.5">
+                    รหัสผ่าน
+                  </span>
+                }
+                required
+                error={errors.password}
+              >
                 <div className="relative">
                   <input
                     type={showPass ? "text" : "password"}
                     className={inputCls(errors.password)}
                     value={form.password}
                     onChange={(e) => set("password", e.target.value)}
-                    placeholder="อย่างน้อย 6 ตัวอักษร"
+                    placeholder="กำหนดรหัสผ่านเบื้องต้น"
                   />
                   <button
                     type="button"
@@ -204,12 +223,12 @@ function CreateUserModal({
           {/* Section: ข้อมูลส่วนตัว */}
           <div>
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-3">
-              ข้อมูลส่วนตัว <span className="normal-case font-normal text-slate-600">(ไม่บังคับ)</span>
+              ข้อมูลส่วนตัว
             </p>
             <div className="grid grid-cols-3 gap-4">
-              <Field label="คำนำหน้า">
+              <Field label="คำนำหน้า" required error={errors.prefix}>
                 <select
-                  className={inputCls()}
+                  className={inputCls(errors.prefix)}
                   value={form.prefix}
                   onChange={(e) => set("prefix", e.target.value)}
                 >
@@ -219,17 +238,17 @@ function CreateUserModal({
                   <option value="นางสาว">นางสาว</option>
                 </select>
               </Field>
-              <Field label="ชื่อ">
+              <Field label="ชื่อ" required error={errors.first_name}>
                 <input
-                  className={inputCls()}
+                  className={inputCls(errors.first_name)}
                   value={form.first_name}
                   onChange={(e) => set("first_name", e.target.value)}
                   placeholder="ชื่อจริง"
                 />
               </Field>
-              <Field label="นามสกุล">
+              <Field label="นามสกุล" required error={errors.last_name}>
                 <input
-                  className={inputCls()}
+                  className={inputCls(errors.last_name)}
                   value={form.last_name}
                   onChange={(e) => set("last_name", e.target.value)}
                   placeholder="นามสกุล"
@@ -252,7 +271,7 @@ function CreateUserModal({
                   placeholder="เช่น วิศวกรรมศาสตร์"
                 />
               </Field>
-              <Field label="ภาควิชา">
+              <Field label="หลักสูตร/สาขาวิชา">
                 <input
                   className={inputCls()}
                   value={form.department}
@@ -260,12 +279,20 @@ function CreateUserModal({
                   placeholder="เช่น วิศวกรรมคอมพิวเตอร์"
                 />
               </Field>
-              <Field label="อาชีพ / ที่ทำงาน" >
+              <Field label="ตำแหน่ง" >
                 <input
-                  className={`${inputCls()} col-span-2`}
+                  className={`${inputCls()}`}
                   value={form.occupation}
                   onChange={(e) => set("occupation", e.target.value)}
-                  placeholder="เช่น Software Engineer @ Google"
+                  placeholder="เช่น Software Engineer"
+                />
+              </Field>
+              <Field label="หน่วยงาน / สังกัด" >
+                <input
+                  className={`${inputCls()}`}
+                  value={form.company}
+                  onChange={(e) => set("company", e.target.value)}
+                  placeholder="เช่น บริษัท, โรงงาน, สถาบัน"
                 />
               </Field>
             </div>
@@ -277,6 +304,11 @@ function CreateUserModal({
           {neo4jWarn && (
             <p className="text-xs text-amber-400 flex-1">
               ⚠️ บัญชีสร้างสำเร็จ แต่ยังไม่ได้ sync ไป Neo4j (Neo4j อาจไม่ได้รัน)
+            </p>
+          )}
+          {generalError && (
+            <p className="text-xs text-red-400 flex-1">
+              ⚠️ {generalError}
             </p>
           )}
           <div className="flex gap-3 ml-auto">
@@ -308,6 +340,272 @@ function CreateUserModal({
   );
 }
 
+// ─── Edit User Modal ────────────────────────────────
+function EditUserModal({
+  user,
+  onClose,
+  onSuccess,
+}: {
+  user: AdminUser;
+  onClose: () => void;
+  onSuccess: (msg?: string) => void;
+}) {
+  const [form, setForm] = useState<Partial<CreateForm>>({
+    student_id: user.student_id,
+    email: user.email,
+    role: user.role,
+    prefix: user.prefix || "",
+    first_name: user.first_name || "",
+    last_name: user.last_name || "",
+    faculty: user.faculty || "",
+    department: user.department || "",
+    occupation: user.occupation || "",
+    company: user.company || "",
+  });
+  const [errors, setErrors] = useState<Partial<CreateForm>>({});
+  const [loading, setLoading] = useState(false);
+  const [generalError, setGeneralError] = useState("");
+
+  const set = (k: keyof CreateForm, v: string) => {
+    setForm((f) => ({ ...f, [k]: v }));
+    setErrors((e) => ({ ...e, [k]: "" }));
+    setGeneralError("");
+  };
+
+  const handleSubmit = async () => {
+    // Check if anything changed
+    const isUnchanged = (
+      form.student_id === user.student_id &&
+      form.email === user.email &&
+      form.role === user.role &&
+      (form.prefix || "") === (user.prefix || "") &&
+      (form.first_name || "") === (user.first_name || "") &&
+      (form.last_name || "") === (user.last_name || "") &&
+      (form.faculty || "") === (user.faculty || "") &&
+      (form.department || "") === (user.department || "") &&
+      (form.occupation || "") === (user.occupation || "") &&
+      (form.company || "") === (user.company || "")
+    );
+
+    if (isUnchanged) {
+      onSuccess("ไม่มีการเปลี่ยนแปลงข้อมูล");
+      onClose();
+      return;
+    }
+
+    setLoading(true);
+    setErrors({});
+    setGeneralError("");
+    let isValid = true;
+    if (!form.prefix) {
+      setErrors((prev) => ({ ...prev, prefix: "กรุณาเลือกคำนำหน้า" }));
+      isValid = false;
+    }
+    if (!form.first_name) {
+      setErrors((prev) => ({ ...prev, first_name: "กรุณากรอกชื่อ" }));
+      isValid = false;
+    }
+    if (!form.last_name) {
+      setErrors((prev) => ({ ...prev, last_name: "กรุณากรอกนามสกุล" }));
+      isValid = false;
+    }
+
+    if (!isValid) {
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const res = await api.patch(`/api/admin/users/${user.id}/`, form);
+      if (res.data.neo4j_synced === false) {
+        onSuccess("อัปเดตข้อมูลสำเร็จ! 🎉 (⚠️ แต่ไม่ได้ซิงค์ไป Neo4j เนื่องจากไม่ได้เปิดใช้งาน)");
+      } else {
+        onSuccess("อัปเดตข้อมูลสำเร็จ! 🎉");
+      }
+      onClose();
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { errors?: Partial<CreateForm>; error?: string } } };
+      const errs = axiosErr.response?.data?.errors;
+      const msg = axiosErr.response?.data?.error;
+      if (errs) setErrors(errs as Partial<CreateForm>);
+      if (msg) setGeneralError(msg);
+      if (!errs && !msg) setGeneralError("เกิดข้อผิดพลาดจากเซิร์ฟเวอร์");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+      <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-2xl shadow-xl
+                      flex flex-col max-h-[90vh]">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-violet-100 flex items-center justify-center">
+              <Edit size={17} className="text-violet-600" />
+            </div>
+            <div>
+              <h2 className="text-base font-semibold text-slate-900">แก้ไขข้อมูลผู้ใช้</h2>
+              <p className="text-xs text-slate-500">แก้ไขข้อมูลของ {user.student_id}</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
+
+          {/* Section: บัญชี */}
+          <div>
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-3">
+              ข้อมูลบัญชี
+            </p>
+            <div className="grid grid-cols-2 gap-4">
+              <Field label="Student ID" error={errors.student_id}>
+                <input
+                  className={inputCls(errors.student_id)}
+                  value={form.student_id}
+                  onChange={(e) => set("student_id", e.target.value)}
+                />
+              </Field>
+
+              <Field label="Role">
+                <select
+                  className={inputCls()}
+                  value={form.role}
+                  onChange={(e) => set("role", e.target.value)}
+                >
+                  <option value="ALUMNI">ALUMNI — ศิษย์เก่า</option>
+                  <option value="ADMIN">ADMIN — ผู้ดูแล</option>
+                </select>
+              </Field>
+
+              <Field label="Email" error={errors.email}>
+                <input
+                  type="email"
+                  className={inputCls(errors.email)}
+                  value={form.email}
+                  onChange={(e) => set("email", e.target.value)}
+                />
+              </Field>
+            </div>
+          </div>
+
+          {/* Section: ข้อมูลส่วนตัว */}
+          <div>
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-3">
+              ข้อมูลส่วนตัว
+            </p>
+            <div className="grid grid-cols-3 gap-4">
+              <Field label="คำนำหน้า" required error={errors.prefix}>
+                <select
+                  className={inputCls(errors.prefix)}
+                  value={form.prefix}
+                  onChange={(e) => set("prefix", e.target.value)}
+                >
+                  <option value="">— ไม่ระบุ —</option>
+                  <option value="นาย">นาย</option>
+                  <option value="นาง">นาง</option>
+                  <option value="นางสาว">นางสาว</option>
+                </select>
+              </Field>
+              <Field label="ชื่อ" required error={errors.first_name}>
+                <input
+                  className={inputCls(errors.first_name)}
+                  value={form.first_name}
+                  onChange={(e) => set("first_name", e.target.value)}
+                />
+              </Field>
+              <Field label="นามสกุล" required error={errors.last_name}>
+                <input
+                  className={inputCls(errors.last_name)}
+                  value={form.last_name}
+                  onChange={(e) => set("last_name", e.target.value)}
+                />
+              </Field>
+            </div>
+          </div>
+
+          {/* Section: การศึกษา / อาชีพ */}
+          <div>
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-3">
+              การศึกษา & อาชีพ
+            </p>
+            <div className="grid grid-cols-2 gap-4">
+              <Field label="คณะ">
+                <input
+                  className={inputCls()}
+                  value={form.faculty}
+                  onChange={(e) => set("faculty", e.target.value)}
+                />
+              </Field>
+              <Field label="หลักสูตร/สาขาวิชา">
+                <input
+                  className={inputCls()}
+                  value={form.department}
+                  onChange={(e) => set("department", e.target.value)}
+                />
+              </Field>
+              <Field label="ตำแหน่ง" >
+                <input
+                  className={`${inputCls()}`}
+                  value={form.occupation}
+                  onChange={(e) => set("occupation", e.target.value)}
+                />
+              </Field>
+              <Field label="หน่วยงาน / สังกัด" >
+                <input
+                  className={`${inputCls()}`}
+                  value={form.company}
+                  onChange={(e) => set("company", e.target.value)}
+                />
+              </Field>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-4 border-t border-slate-100 flex items-center gap-3">
+          {generalError && (
+            <p className="text-xs text-red-500 flex-1">
+              ⚠️ {generalError}
+            </p>
+          )}
+          <div className="flex gap-3 ml-auto">
+            <button
+              onClick={onClose}
+              disabled={loading}
+              className="px-5 py-2.5 text-sm font-medium text-slate-600 border border-slate-300
+                         rounded-xl hover:bg-slate-50 transition disabled:opacity-50"
+            >
+              ยกเลิก
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={loading}
+              className="px-6 py-2.5 text-sm font-semibold bg-violet-600 hover:bg-violet-700
+                         text-white rounded-xl transition disabled:opacity-50 flex items-center gap-2"
+            >
+              {loading ? (
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : (
+                <Edit size={15} />
+              )}
+              {loading ? "กำลังบันทึก..." : "บันทึกข้อมูล"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Confirm Modal ────────────────────────────────────
 function ConfirmModal({
   message, onConfirm, onCancel, danger,
@@ -318,11 +616,11 @@ function ConfirmModal({
   danger?: boolean;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl">
-        <p className="text-white text-sm mb-6 text-center leading-relaxed">{message}</p>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      <div className="bg-white border border-slate-200 rounded-2xl p-6 max-w-sm w-full mx-4 shadow-xl">
+        <p className="text-slate-900 text-sm mb-6 text-center leading-relaxed">{message}</p>
         <div className="flex gap-3">
-          <button onClick={onCancel} className="flex-1 py-2 text-sm text-slate-400 border border-slate-700 rounded-lg hover:bg-slate-800 transition">
+          <button onClick={onCancel} className="flex-1 py-2 text-sm text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 transition">
             ยกเลิก
           </button>
           <button
@@ -346,6 +644,7 @@ export default function AdminUsersPage() {
   const [role, setRole] = useState("");
   const [page, setPage] = useState(1);
   const [showCreate, setShowCreate] = useState(false);
+  const [editingUser, setEditingUser] = useState<AdminUser | null>(null);
   const [confirm, setConfirm] = useState<{
     message: string; onConfirm: () => void; danger?: boolean;
   } | null>(null);
@@ -385,21 +684,7 @@ export default function AdminUsersPage() {
     });
   };
 
-  const toggleActive = (user: AdminUser) => {
-    const action = user.is_active ? "ระงับ" : "เปิดใช้งาน";
-    setConfirm({
-      message: `${action}บัญชี ${user.student_id}?`,
-      danger: user.is_active,
-      onConfirm: async () => {
-        setConfirm(null);
-        try {
-          await api.patch(`/api/admin/users/${user.id}/`, { is_active: !user.is_active });
-          showToast(`${action}บัญชีสำเร็จ`);
-          fetchUsers();
-        } catch { showToast("เกิดข้อผิดพลาด", false); }
-      },
-    });
-  };
+
 
   const deleteUser = (user: AdminUser) => {
     setConfirm({
@@ -431,7 +716,14 @@ export default function AdminUsersPage() {
       {showCreate && (
         <CreateUserModal
           onClose={() => setShowCreate(false)}
-          onSuccess={() => { showToast("สร้างบัญชีสำเร็จ! 🎉"); fetchUsers(); }}
+          onSuccess={(msg) => { showToast(msg || "สร้างบัญชีสำเร็จ! 🎉"); setTimeout(() => window.location.reload(), 1500); }}
+        />
+      )}
+      {editingUser && (
+        <EditUserModal
+          user={editingUser}
+          onClose={() => setEditingUser(null)}
+          onSuccess={(msg) => { showToast(msg || "แก้ไขข้อมูลสำเร็จ! 🎉"); fetchUsers(); }}
         />
       )}
       {confirm && (
@@ -446,8 +738,8 @@ export default function AdminUsersPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-white">จัดการ Users</h1>
-          <p className="text-slate-400 text-sm mt-1">
+          <h1 className="text-2xl font-bold text-slate-900">จัดการบัญชี</h1>
+          <p className="text-slate-500 text-sm mt-1">
             {data ? `${data.total.toLocaleString()} ผู้ใช้ทั้งหมด` : "กำลังโหลด..."}
           </p>
         </div>
@@ -472,25 +764,24 @@ export default function AdminUsersPage() {
             placeholder="ค้นหา Student ID, ชื่อ, อีเมล..."
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            className="w-full pl-9 pr-4 py-2.5 bg-slate-900 border border-slate-700 rounded-xl
-                       text-sm text-white placeholder-slate-500 focus:outline-none focus:border-violet-500 transition"
+            className="w-full pl-9 pr-4 py-2.5 bg-white border border-slate-300 rounded-xl
+                       text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-violet-500 transition focus:ring-1 focus:ring-violet-500"
           />
         </div>
         <select
           value={role}
           onChange={(e) => setRole(e.target.value)}
-          className="bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5
-                     text-sm text-white focus:outline-none focus:border-violet-500 transition"
+          className="bg-white border border-slate-300 rounded-xl px-4 py-2.5
+                     text-sm text-slate-900 focus:outline-none focus:border-violet-500 transition focus:ring-1 focus:ring-violet-500"
         >
           <option value="">ทุก Role</option>
           <option value="ALUMNI">ALUMNI</option>
-          <option value="STUDENT">STUDENT</option>
           <option value="ADMIN">ADMIN</option>
         </select>
       </div>
 
       {/* Table */}
-      <div className="bg-slate-900/70 border border-slate-800 rounded-2xl overflow-hidden">
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
         {loading ? (
           <div className="flex justify-center py-16">
             <div className="w-8 h-8 border-4 border-violet-500/30 border-t-violet-500 rounded-full animate-spin" />
@@ -501,31 +792,30 @@ export default function AdminUsersPage() {
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-slate-800 text-xs text-slate-500 uppercase tracking-wider">
+                <tr className="border-b border-slate-200 bg-slate-50 text-xs text-slate-500 uppercase tracking-wider">
                   <th className="text-left px-5 py-3">ผู้ใช้</th>
                   <th className="text-left px-4 py-3">คณะ</th>
                   <th className="text-left px-4 py-3">Role</th>
-                  <th className="text-left px-4 py-3">สถานะ</th>
                   <th className="text-left px-4 py-3">สมัครวันที่</th>
                   <th className="text-right px-5 py-3">จัดการ</th>
                 </tr>
               </thead>
               <tbody>
                 {data.results.map((u) => (
-                  <tr key={u.id} className="border-b border-slate-800/60 hover:bg-slate-800/30 transition-colors">
+                  <tr key={u.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full overflow-hidden flex-shrink-0">
+                        <div className="w-9 h-9 rounded-full overflow-hidden flex-shrink-0 bg-slate-100">
                           {u.avatar ? (
                             <img src={u.avatar} alt="" className="w-full h-full object-cover" />
                           ) : (
-                            <div className="w-full h-full bg-slate-700 flex items-center justify-center text-slate-300 text-sm font-bold">
+                            <div className="w-full h-full flex items-center justify-center text-slate-400 text-xs font-bold">
                               {u.first_name ? u.first_name[0] : u.student_id[0]}
                             </div>
                           )}
                         </div>
                         <div className="min-w-0">
-                          <p className="text-sm font-medium text-white truncate">
+                          <p className="text-sm font-semibold text-slate-900 truncate">
                             {u.prefix} {u.first_name} {u.last_name || ""}
                           </p>
                           <p className="text-xs text-slate-500 truncate">{u.student_id} · {u.email}</p>
@@ -533,8 +823,8 @@ export default function AdminUsersPage() {
                       </div>
                     </td>
                     <td className="px-4 py-4">
-                      <p className="text-sm text-slate-300 truncate max-w-32">{u.faculty || "—"}</p>
-                      <p className="text-xs text-slate-600 truncate max-w-32">{u.department || ""}</p>
+                      <p className="text-sm text-slate-700 truncate max-w-32">{u.faculty || "—"}</p>
+                      <p className="text-xs text-slate-500 truncate max-w-32">{u.department || ""}</p>
                     </td>
                     <td className="px-4 py-4">
                       <select
@@ -542,36 +832,26 @@ export default function AdminUsersPage() {
                         onChange={(e) => changeRole(u, e.target.value)}
                         className={`text-xs font-medium px-2.5 py-1 rounded-full border-0 cursor-pointer
                           focus:outline-none focus:ring-2 focus:ring-violet-500
-                          ${ROLE_COLORS[u.role]} bg-transparent`}
+                          ${ROLE_COLORS[u.role] || "bg-slate-100 text-slate-700"} bg-transparent`}
                       >
                         <option value="ALUMNI">ALUMNI</option>
-                        <option value="STUDENT">STUDENT</option>
                         <option value="ADMIN">ADMIN</option>
                       </select>
-                    </td>
-                    <td className="px-4 py-4">
-                      <span className={`text-xs font-medium px-2.5 py-1 rounded-full
-                        ${u.is_active ? "bg-green-500/15 text-green-400" : "bg-slate-700/50 text-slate-500"}`}>
-                        {u.is_active ? "Active" : "Banned"}
-                      </span>
                     </td>
                     <td className="px-4 py-4 text-xs text-slate-500">{u.date_joined}</td>
                     <td className="px-5 py-4">
                       <div className="flex items-center justify-end gap-2">
                         <button
-                          onClick={() => toggleActive(u)}
-                          title={u.is_active ? "ระงับบัญชี" : "เปิดบัญชี"}
-                          className={`p-1.5 rounded-lg transition
-                            ${u.is_active
-                              ? "text-slate-500 hover:text-amber-400 hover:bg-amber-400/10"
-                              : "text-slate-500 hover:text-green-400 hover:bg-green-400/10"}`}
+                          onClick={() => setEditingUser(u)}
+                          title="แก้ไขข้อมูล"
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-violet-600 hover:bg-violet-50 transition"
                         >
-                          {u.is_active ? <Ban size={15} /> : <Shield size={15} />}
+                          <Edit size={15} />
                         </button>
                         <button
                           onClick={() => deleteUser(u)}
                           title="ลบ User"
-                          className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-400/10 transition"
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition"
                         >
                           <Trash2 size={15} />
                         </button>
@@ -595,14 +875,14 @@ export default function AdminUsersPage() {
             <button
               disabled={page <= 1}
               onClick={() => setPage((p) => p - 1)}
-              className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition"
+              className="p-2 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition"
             >
               <ChevronLeft size={16} />
             </button>
             <button
               disabled={page >= data.total_pages}
               onClick={() => setPage((p) => p + 1)}
-              className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition"
+              className="p-2 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition"
             >
               <ChevronRight size={16} />
             </button>

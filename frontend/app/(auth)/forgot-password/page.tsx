@@ -5,6 +5,7 @@ import Link from "next/link";
 import toast, { Toaster } from "react-hot-toast";
 import { Mail, ArrowLeft, CheckCircle } from "lucide-react";
 import { FaUserGraduate } from "react-icons/fa";
+import api from "@/lib/api";
 
 export default function ForgotPasswordPage() {
     const [email, setEmail] = useState("");
@@ -17,12 +18,7 @@ export default function ForgotPasswordPage() {
 
         setSubmitting(true);
         try {
-            const res = await fetch("http://127.0.0.1:8000/api/password-reset/", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email }),
-            });
-            if (!res.ok) throw new Error();
+            await api.post("/api/password-reset/", { email });
             setSent(true);
         } catch {
             toast.error("เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง");

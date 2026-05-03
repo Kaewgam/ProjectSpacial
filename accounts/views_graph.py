@@ -1,15 +1,26 @@
+import os
 from django.http import JsonResponse
 from neo4j import GraphDatabase
+from dotenv import load_dotenv
 
-URI = "bolt://localhost:7687"
-USER = "neo4j"
-PASSWORD = "12345678"
+load_dotenv()
+
+URI      = os.getenv("NEO4J_URI", "bolt://localhost:7687")
+USER     = os.getenv("NEO4J_USER", "neo4j")
+PASSWORD = os.getenv("NEO4J_PASSWORD", "")
 
 driver = GraphDatabase.driver(URI, auth=(USER, PASSWORD))
 
 
 def get_graph_data(request):
     with driver.session() as session:
+        # ดึง Node ทั้งหมด (ทั้งที่มีและไม่มี relationship)
+        all_nodes_result = session.run("""
+            MATCH (n)
+            RETURN n, labels(n) AS n_labels
+        """)
+
+        # ดึง Relationship ทั้งหมด
         result = session.run("""
             MATCH (n)-[r]->(m)
             RETURN
@@ -45,8 +56,18 @@ def get_graph_data(request):
                 "faculty": node.get("faculty"),
                 "department": node.get("department"),
                 "occupation": node.get("occupation"),
+                "company": node.get("company"),
             }
 
+        # ขั้นที่ 1: ใส่ Node ทุกตัวก่อน (รวมถึง User ที่ไม่มี relationship)
+        for record in all_nodes_result:
+            n = record["n"]
+            labels = list(record["n_labels"])
+            node_id = node_to_id(n, labels)
+            if node_id not in nodes_dict:
+                nodes_dict[node_id] = node_to_dict(n, labels)
+
+        # ขั้นที่ 2: เพิ่ม links และ node ที่แสดงใน relationship
         for record in result:
             n1 = record["n"]
             n2 = record["m"]

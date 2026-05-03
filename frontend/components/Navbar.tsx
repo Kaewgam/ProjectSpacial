@@ -8,8 +8,7 @@ import { LogOut, User, ChevronDown } from "lucide-react";
 export default function Navbar() {
     const { user, loading, logout } = useAuth();
 
-    const [newsOpen, setNewsOpen] = useState(false);
-    const [activityOpen, setActivityOpen] = useState(false);
+
     const [profileOpen, setProfileOpen] = useState(false);
     const profileRef = useRef<HTMLDivElement>(null);
 
@@ -32,7 +31,6 @@ export default function Navbar() {
     const roleLabel: Record<string, string> = {
         ALUMNI: "ศิษย์เก่า",
         ADMIN: "ผู้ดูแลระบบ",
-        STUDENT: "นักศึกษา",
     };
 
     return (
@@ -58,38 +56,11 @@ export default function Navbar() {
                         เครือข่าย
                     </Link>
 
-                    {/* ข่าวประชาสัมพันธ์ */}
-                    <div
-                        className="relative"
-                        onMouseEnter={() => setNewsOpen(true)}
-                        onMouseLeave={() => setNewsOpen(false)}
-                    >
-                        <button className="hover:text-black">ข่าวประชาสัมพันธ์</button>
-                        {newsOpen && (
-                            <div className="absolute top-8 left-0 bg-white shadow-lg rounded-md w-48 py-2 z-50">
-                                <Link href="#" className="block px-4 py-2 hover:bg-gray-100">ข่าวทั่วไป</Link>
-                                <Link href="#" className="block px-4 py-2 hover:bg-gray-100">ข่าวรับสมัครงาน</Link>
-                                <Link href="#" className="block px-4 py-2 hover:bg-gray-100">ข่าวศิษย์เก่าดีเด่น</Link>
-                            </div>
-                        )}
-                    </div>
+                    <Link href="/knowledge" className="hover:text-black">
+                        แชร์ความรู้น่าสนใจ
+                    </Link>
 
-                    {/* กิจกรรม */}
-                    <div
-                        className="relative"
-                        onMouseEnter={() => setActivityOpen(true)}
-                        onMouseLeave={() => setActivityOpen(false)}
-                    >
-                        <button className="hover:text-black">กิจกรรม</button>
-                        {activityOpen && (
-                            <div className="absolute top-8 left-0 bg-white shadow-lg rounded-md w-48 py-2 z-50">
-                                <Link href="#" className="block px-4 py-2 hover:bg-gray-100">กิจกรรมที่ผ่านมา</Link>
-                                <Link href="#" className="block px-4 py-2 hover:bg-gray-100">กิจกรรมที่กำลังจะจัด</Link>
-                            </div>
-                        )}
-                    </div>
 
-                    <Link href="#" className="hover:text-black">แหล่งรวมความน่าสนใจ</Link>
                 </div>
 
                 {/* Auth Section */}

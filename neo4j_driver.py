@@ -20,38 +20,40 @@ def sync_user_to_neo4j(user):
                 u.first_name = $first_name,
                 u.last_name = $last_name,
                 u.name = $first_name + " " + $last_name,
-                u.avatar = $avatar
+                u.avatar = $avatar,
+                u.occupation = $occupation
         """,
         student_id=user.student_id,
         first_name=user.first_name,
         last_name=user.last_name,
         email=user.email,
         role=user.role,
-        avatar=avatar_url
+        avatar=avatar_url,
+        occupation=user.occupation
         )
 
         # 🔗 Faculty + Department
-        if user.faculty:
+        if user.faculty_ref:
             session.run("""
                 MATCH (u:User {student_id: $student_id})
                 MERGE (f:Faculty {name: $faculty})
                 MERGE (u)-[:STUDIED_IN]->(f)
-            """, student_id=user.student_id, faculty=user.faculty)
+            """, student_id=user.student_id, faculty=user.faculty_ref.name)
 
-        if user.department:
+        if user.department_ref:
             session.run("""
                 MATCH (u:User {student_id: $student_id})
                 MERGE (d:Department {name: $department})
                 MERGE (u)-[:BELONGS_TO]->(d)
-            """, student_id=user.student_id, department=user.department)
+            """, student_id=user.student_id, department=user.department_ref.name)
 
-        # 💼 Occupation → Company
-        if user.occupation:
+        # 💼 Company
+        if user.company:
             session.run("""
                 MATCH (u:User {student_id: $student_id})
-                MERGE (c:Company {name: $occupation})
+                MERGE (c:Company {name: $company})
                 MERGE (u)-[:WORKS_AS]->(c)
-            """, student_id=user.student_id, occupation=user.occupation)
+            """, student_id=user.student_id, company=user.company)
 
     # 🤝 สร้าง KNOWS อัตโนมัติจาก Faculty / Department / Company เดียวกัน
     auto_create_knows()

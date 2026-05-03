@@ -22,6 +22,7 @@ interface GraphNode {
   faculty?: string;
   department?: string;
   occupation?: string;
+  company?: string;
   avatar?: string;
   val?: number;
   color?: string;
@@ -89,11 +90,16 @@ function LegendItem({ color, label }: { color: string; label: string }) {
 export default function GraphPage() {
   const [rawGraphData, setRawGraphData] = useState<GraphData>({ nodes: [], links: [] });
   const [activeFilters, setActiveFilters] = useState<Record<string, boolean>>({
-    KNOWS: false,
-    STUDIED_IN: false,
-    BELONGS_TO: false,
-    WORKS_AS: false,
+    KNOWS: true,
+    STUDIED_IN: true,
+    BELONGS_TO: true,
+    WORKS_AS: true,
   });
+  const [selectedYears, setSelectedYears] = useState<Set<string>>(new Set());
+  const [selectedFaculty, setSelectedFaculty] = useState<string>("");
+  const [selectedDept, setSelectedDept] = useState<string>("");
+  const [occupationSearch, setOccupationSearch] = useState<string>("");
+  const [companySearch, setCompanySearch] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
@@ -123,7 +129,8 @@ export default function GraphPage() {
     const fetchGraph = async () => {
       try {
         setLoading(true);
-        const res = await fetch("http://localhost:8000/graph-data/");
+        const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
+        const res = await fetch(`${BASE}/graph-data/`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
 
@@ -136,7 +143,25 @@ export default function GraphPage() {
           val: n.val || 6,
         }));
 
-        setRawGraphData({ nodes, links: data.links || [] });
+        const links = data.links || [];
+        
+        // Resolve faculty/department/company for user nodes from relationships
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        links.forEach((l: any) => {
+          const s = typeof l.source === "object" ? l.source.id : l.source;
+          const t = typeof l.target === "object" ? l.target.id : l.target;
+          
+          const sNode = nodes.find(n => n.id === s);
+          const tNode = nodes.find(n => n.id === t);
+          
+          if (sNode && sNode.type === "user" && tNode) {
+             if (l.type === "STUDIED_IN" && tNode.type === "faculty") sNode.faculty = tNode.id;
+             if (l.type === "BELONGS_TO" && tNode.type === "department") sNode.department = tNode.id;
+             if (l.type === "WORKS_AS" && tNode.type === "company") sNode.company = tNode.id;
+          }
+        });
+
+        setRawGraphData({ nodes, links });
       } catch (err) {
         setError(err instanceof Error ? err.message : "ไม่สามารถโหลดข้อมูลกราฟได้");
       } finally {
@@ -149,20 +174,75 @@ export default function GraphPage() {
 
 
 
+  // ── Compute Dropdown Options ──
+  const { availableYears, availableFaculties, availableDepts, availableOccupations, availableCompanies } = useMemo(() => {
+    const years = new Set<string>();
+    const faculties = new Set<string>();
+    const depts = new Set<string>();
+    const occupations = new Set<string>();
+    const companies = new Set<string>();
+
+    rawGraphData.nodes.forEach(n => {
+      if (n.type === "user") {
+        // Validate year: must be exactly 2 digits
+        if (n.id && /^\d{2}/.test(n.id)) {
+          years.add(n.id.substring(0, 2));
+        }
+        
+        if (n.faculty) faculties.add(n.faculty);
+        if (n.department && (!selectedFaculty || n.faculty === selectedFaculty)) depts.add(n.department);
+        if (n.company) companies.add(n.company);
+        if (n.occupation) occupations.add(n.occupation);
+      }
+    });
+
+    return {
+      availableYears: Array.from(years).sort((a, b) => b.localeCompare(a)), // ใหม่ไปเก่า
+      availableFaculties: Array.from(faculties).sort(),
+      availableDepts: Array.from(depts).sort(),
+      availableOccupations: Array.from(occupations).sort(),
+      availableCompanies: Array.from(companies).sort(),
+    };
+  }, [rawGraphData.nodes, selectedFaculty]);
+
   // ── Data Filtering Logic ──
   const displayData = useMemo(() => {
-    // 1. Filter Links
-    const links = rawGraphData.links.filter((l) => activeFilters[l.type as string]);
-
-    // 2. Decide Node Visibility
-    const activeNodeTypes = new Set<string>();
+    // 1. Filter Nodes (User) based on search/dropdown criteria
+    const validUserIds = new Set<string>();
     
-    // โชว์ User ก็ต่อเมื่อมีการเปิดตัวกรองความสัมพันธ์ใดๆ ก็ตามอย่างน้อย 1 อัน
-    const isAnyActive = Object.values(activeFilters).some(Boolean);
-    if (isAnyActive) {
-      activeNodeTypes.add("user");
-    }
+    rawGraphData.nodes.forEach(n => {
+      if (n.type === "user") {
+        const isYearValid = n.id && /^\d{2}/.test(n.id);
+        const matchYear = selectedYears.size === 0 || (isYearValid && selectedYears.has(n.id.substring(0, 2)));
+        const matchFaculty = !selectedFaculty || n.faculty === selectedFaculty;
+        const matchDept = !selectedDept || n.department === selectedDept;
+        const matchOcc = !occupationSearch || n.occupation === occupationSearch;
+        const matchComp = !companySearch || n.company === companySearch;
 
+        if (matchYear && matchFaculty && matchDept && matchOcc && matchComp) {
+          validUserIds.add(n.id);
+        }
+      }
+    });
+
+    // 2. Filter Links (Only active types AND connecting valid nodes)
+    const links = rawGraphData.links.filter(l => {
+      if (!activeFilters[l.type as string]) return false;
+      
+      const s = typeof l.source === "object" ? l.source.id : l.source;
+      const t = typeof l.target === "object" ? l.target.id : l.target;
+
+      // Check if the link connects to a valid user (or another non-user node, but user must be valid)
+      const sourceUserValid = !rawGraphData.nodes.find(n => n.id === s && n.type === "user") || validUserIds.has(s);
+      const targetUserValid = !rawGraphData.nodes.find(n => n.id === t && n.type === "user") || validUserIds.has(t);
+      
+      return sourceUserValid && targetUserValid;
+    });
+
+    // 3. Decide Node Visibility
+    const activeNodeTypes = new Set<string>();
+    const isAnyActive = Object.values(activeFilters).some(Boolean);
+    if (isAnyActive) activeNodeTypes.add("user");
     if (activeFilters.STUDIED_IN) activeNodeTypes.add("faculty");
     if (activeFilters.BELONGS_TO) activeNodeTypes.add("department");
     if (activeFilters.WORKS_AS) activeNodeTypes.add("company");
@@ -170,25 +250,22 @@ export default function GraphPage() {
     const activeNodeIds = new Set<string>();
     rawGraphData.nodes.forEach((n) => {
       if (n.type === "user") {
-        activeNodeIds.add(n.id);
+        if (validUserIds.has(n.id)) activeNodeIds.add(n.id);
       } else if (activeNodeTypes.has(n.type as string)) {
-        // Option: Show faculty/company node ONLY if there's a link connected to it to avoid clutter
-        // For now, let's just show those that have active edges pointing to them
+        // Show faculty/company ONLY if they are connected to valid users
         const hasEdge = links.some((l) => {
           const s = typeof l.source === "object" ? l.source.id : l.source;
           const t = typeof l.target === "object" ? l.target.id : l.target;
           return s === n.id || t === n.id;
         });
-        if (hasEdge) {
-          activeNodeIds.add(n.id);
-        }
+        if (hasEdge) activeNodeIds.add(n.id);
       }
     });
 
     const nodes = rawGraphData.nodes.filter((n) => activeNodeIds.has(n.id));
 
     return { nodes, links };
-  }, [rawGraphData, activeFilters]);
+  }, [rawGraphData, activeFilters, selectedYears, selectedFaculty, selectedDept, occupationSearch, companySearch]);
 
   // Highlight on hover
   const handleNodeHover = useCallback(
@@ -458,153 +535,192 @@ export default function GraphPage() {
         </div>
 
         {/* ─── Side Panel ─── */}
-        <div className="w-64 flex flex-col gap-4 flex-shrink-0">
-          {/* Legend */}
-          <div className="bg-slate-800/60 backdrop-blur border border-slate-700/50 rounded-xl p-4">
-            <p className="text-xs font-semibold text-slate-300 mb-3 uppercase tracking-wider">
-              Legend
-            </p>
-            <div className="flex flex-col gap-2">
-              <LegendItem color="#a78bfa" label="User / ศิษย์เก่า" />
-              <LegendItem color="#34d399" label="Faculty / คณะ" />
-              <LegendItem color="#60a5fa" label="Department / ภาควิชา" />
-              <LegendItem color="#f59e0b" label="Company / ที่ทำงาน" />
+        <div className="w-80 flex flex-col gap-3 flex-shrink-0" style={{ height: "calc(100vh - 180px)" }}>
+
+          {/* ── ส่วนบน: Filter (scroll ได้) ── */}
+          <div className="flex flex-col gap-3 overflow-y-auto flex-shrink-0" style={{ maxHeight: "55%" }}>
+
+            {/* ── กรองผู้ใช้ ── */}
+            <div className="bg-slate-800/60 backdrop-blur border border-slate-700/50 rounded-xl p-4 flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold text-slate-300 uppercase tracking-wider">👥 กรองผู้ใช้</p>
+                {(selectedYears.size > 0 || selectedFaculty || selectedDept || occupationSearch || companySearch) && (
+                  <button onClick={() => { setSelectedYears(new Set()); setSelectedFaculty(""); setSelectedDept(""); setOccupationSearch(""); setCompanySearch(""); }} className="text-xs text-violet-400 hover:text-violet-200 transition">ล้างทั้งหมด</button>
+                )}
+              </div>
+
+              {/* รุ่น */}
+              <div>
+                <p className="text-xs text-slate-400 mb-1.5">🎓 รุ่น (2 ตัวแรกของรหัสนักศึกษา)</p>
+                <select
+                  value={selectedYears.size > 0 ? [...selectedYears][0] : ""}
+                  onChange={e => { const v = e.target.value; setSelectedYears(v ? new Set([v]) : new Set()); }}
+                  className="w-full text-xs bg-slate-900/70 border border-slate-600 rounded-lg px-2.5 py-1.5 text-slate-300 focus:outline-none focus:border-violet-500 transition-colors">
+                  <option value="">— ทั้งหมด —</option>
+                  {availableYears.map(y => <option key={y} value={y}>รุ่น {y}</option>)}
+                </select>
+              </div>
+
+              {/* คณะ */}
+              <div>
+                <p className="text-xs text-slate-400 mb-1.5">🏛️ คณะ</p>
+                <select value={selectedFaculty}
+                  onChange={e => { setSelectedFaculty(e.target.value); setSelectedDept(""); }}
+                  className="w-full text-xs bg-slate-900/70 border border-slate-600 rounded-lg px-2.5 py-1.5 text-slate-300 focus:outline-none focus:border-violet-500 transition-colors">
+                  <option value="">— ทั้งหมด —</option>
+                  {availableFaculties.map(f => <option key={f} value={f}>{f}</option>)}
+                </select>
+              </div>
+
+              {/* สาขาวิชา */}
+              <div>
+                <p className="text-xs text-slate-400 mb-1.5">📚 สาขาวิชา / หลักสูตร</p>
+                <select value={selectedDept} onChange={e => setSelectedDept(e.target.value)}
+                  className="w-full text-xs bg-slate-900/70 border border-slate-600 rounded-lg px-2.5 py-1.5 text-slate-300 focus:outline-none focus:border-violet-500 transition-colors"
+                  disabled={availableDepts.length === 0}>
+                  <option value="">— ทั้งหมด —</option>
+                  {availableDepts.map(d => <option key={d} value={d}>{d}</option>)}
+                </select>
+              </div>
+
+              {/* ตำแหน่งงาน */}
+              <div>
+                <p className="text-xs text-slate-400 mb-1.5">💼 ตำแหน่งงาน</p>
+                <select value={occupationSearch} onChange={e => setOccupationSearch(e.target.value)}
+                  className="w-full text-xs bg-slate-900/70 border border-slate-600 rounded-lg px-2.5 py-1.5 text-slate-300 focus:outline-none focus:border-violet-500 transition-colors">
+                  <option value="">— ทั้งหมด —</option>
+                  {availableOccupations.map(o => <option key={o} value={o}>{o}</option>)}
+                </select>
+              </div>
+
+              {/* บริษัท / หน่วยงาน */}
+              <div>
+                <p className="text-xs text-slate-400 mb-1.5">🏢 บริษัท / หน่วยงาน</p>
+                <select value={companySearch} onChange={e => setCompanySearch(e.target.value)}
+                  className="w-full text-xs bg-slate-900/70 border border-slate-600 rounded-lg px-2.5 py-1.5 text-slate-300 focus:outline-none focus:border-violet-500 transition-colors">
+                  <option value="">— ทั้งหมด —</option>
+                  {availableCompanies.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+
+              {/* จำนวนที่แสดง */}
+              <div className="bg-slate-900/50 rounded-lg px-3 py-2 text-center">
+                <span className="text-xs text-slate-400">กำลังแสดง </span>
+                <span className="text-xs font-bold text-violet-300">{displayData.nodes.filter(n => n.type === "user").length}</span>
+                <span className="text-xs text-slate-400"> / {rawGraphData.nodes.filter(n => n.type === "user").length} คน</span>
+              </div>
             </div>
-            <div className="mt-3 pt-3 border-t border-slate-700/50">
-              <p className="text-xs font-semibold text-slate-300 mb-2 uppercase tracking-wider">
-                Relationship Filters
-              </p>
+
+            {/* ── ตัวกรองความสัมพันธ์ ── */}
+            <div className="bg-slate-800/60 backdrop-blur border border-slate-700/50 rounded-xl p-4">
+              <p className="text-xs font-semibold text-slate-300 mb-2 uppercase tracking-wider">🔗 ประเภทความสัมพันธ์</p>
               <div className="flex flex-col gap-2 text-xs">
                 {Object.entries(activeFilters).map(([rel, isActive]) => (
-                  <button
-                    key={rel}
+                  <button key={rel}
                     onClick={() => setActiveFilters(prev => ({ ...prev, [rel]: !prev[rel] }))}
                     className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors border text-left ${
-                      isActive 
-                        ? 'bg-violet-500/20 text-violet-300 border-violet-500/50 hover:bg-violet-500/30' 
-                        : 'bg-slate-900/50 text-slate-400 border-slate-700/50 hover:bg-slate-800'
-                    }`}
-                  >
-                    <div className={`w-3 h-3 rounded-sm flex items-center justify-center transition-colors ${isActive ? 'bg-violet-500' : 'border border-slate-500'}`}>
+                      isActive
+                        ? "bg-violet-500/20 text-violet-300 border-violet-500/50 hover:bg-violet-500/30"
+                        : "bg-slate-900/50 text-slate-400 border-slate-700/50 hover:bg-slate-800"
+                    }`}>
+                    <div className={`w-3 h-3 rounded-sm flex items-center justify-center transition-colors ${isActive ? "bg-violet-500" : "border border-slate-500"}`}>
                       {isActive && <svg className="w-2 h-2 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
                     </div>
                     <span>
-                      {rel === 'KNOWS' ? '→ KNOWS (รู้จักกัน)' :
-                       rel === 'STUDIED_IN' ? '→ STUDIED_IN (เรียนที่)' :
-                       rel === 'BELONGS_TO' ? '→ BELONGS_TO (สังกัด)' :
-                       '→ WORKS_AS (ทำงานที่)'}
+                      {rel === "KNOWS" ? "รู้จักกัน (KNOWS)" :
+                       rel === "STUDIED_IN" ? "เรียนที่คณะ (STUDIED_IN)" :
+                       rel === "BELONGS_TO" ? "สังกัดสาขา (BELONGS_TO)" :
+                       "ทำงานที่ (WORKS_AS)"}
                     </span>
                   </button>
                 ))}
               </div>
+              <div className="mt-3 pt-3 border-t border-slate-700/50">
+                <p className="text-xs font-semibold text-slate-400 mb-2">สัญลักษณ์สี</p>
+                <div className="flex flex-col gap-1.5">
+                  <LegendItem color="#a78bfa" label="ศิษย์เก่า (User)" />
+                  <LegendItem color="#34d399" label="คณะ (Faculty)" />
+                  <LegendItem color="#60a5fa" label="สาขาวิชา (Department)" />
+                  <LegendItem color="#f59e0b" label="หน่วยงาน (Company)" />
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Selected Node Info */}
-          {selectedNode ? (
-            <div className="bg-slate-800/60 backdrop-blur border border-violet-500/30 rounded-xl p-4 flex-1 overflow-y-auto">
-              <p className="text-xs font-semibold text-violet-400 mb-3 uppercase tracking-wider">
-                รายละเอียด
-              </p>
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-12 h-12 rounded-full border-2 border-violet-500/40 flex items-center justify-center overflow-hidden flex-shrink-0 bg-violet-500/20">
-                  {selectedNode.avatar ? (
-                    <img 
-                      src={selectedNode.avatar} 
-                      alt={selectedNode.name || "avatar"} 
-                      className="w-full h-full object-cover" 
-                    />
-                  ) : (
-                    <span className="text-violet-300 font-bold text-lg">
-                      {selectedNode.name
-                        ? selectedNode.name.charAt(0).toUpperCase()
-                        : selectedNode.id.charAt(0).toUpperCase()}
-                    </span>
+          {/* ── ส่วนล่าง: รายละเอียด + Status ── */}
+          <div className="flex flex-col gap-3 flex-1 min-h-0">
+            {selectedNode ? (
+              <div className="bg-slate-800/60 backdrop-blur border border-violet-500/30 rounded-xl p-4 flex-1 overflow-y-auto">
+                <p className="text-xs font-semibold text-violet-400 mb-3 uppercase tracking-wider">รายละเอียด</p>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-12 h-12 rounded-full border-2 border-violet-500/40 flex items-center justify-center overflow-hidden flex-shrink-0 bg-violet-500/20">
+                    {selectedNode.avatar ? (
+                      <img src={selectedNode.avatar} alt={selectedNode.name || "avatar"} className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-violet-300 font-bold text-lg">
+                        {selectedNode.name ? selectedNode.name.charAt(0).toUpperCase() : selectedNode.id.charAt(0).toUpperCase()}
+                      </span>
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-white leading-tight truncate">{selectedNode.name || "—"}</p>
+                    <p className="text-xs text-slate-400 mt-0.5">🪪 {selectedNode.id}</p>
+                  </div>
+                </div>
+                <div className="space-y-2 mb-4">
+                  {selectedNode.faculty && (
+                    <div className="flex items-start gap-2 bg-slate-900/50 rounded-lg px-3 py-2">
+                      <span className="text-sm mt-0.5">🎓</span>
+                      <div className="min-w-0"><p className="text-xs text-slate-500">คณะ</p><p className="text-xs text-slate-200 font-medium">{selectedNode.faculty}</p></div>
+                    </div>
+                  )}
+                  {selectedNode.department && (
+                    <div className="flex items-start gap-2 bg-slate-900/50 rounded-lg px-3 py-2">
+                      <span className="text-sm mt-0.5">📚</span>
+                      <div className="min-w-0"><p className="text-xs text-slate-500">สาขาวิชา</p><p className="text-xs text-slate-200 font-medium">{selectedNode.department}</p></div>
+                    </div>
+                  )}
+                  {selectedNode.occupation && (
+                    <div className="flex items-start gap-2 bg-slate-900/50 rounded-lg px-3 py-2">
+                      <span className="text-sm mt-0.5">💼</span>
+                      <div className="min-w-0"><p className="text-xs text-slate-500">ตำแหน่ง</p><p className="text-xs text-slate-200 font-medium">{selectedNode.occupation}</p></div>
+                    </div>
+                  )}
+                  {selectedNode.company && (
+                    <div className="flex items-start gap-2 bg-slate-900/50 rounded-lg px-3 py-2">
+                      <span className="text-sm mt-0.5">🏢</span>
+                      <div className="min-w-0"><p className="text-xs text-slate-500">หน่วยงาน</p><p className="text-xs text-slate-200 font-medium">{selectedNode.company}</p></div>
+                    </div>
+                  )}
+                  {!selectedNode.faculty && !selectedNode.department && !selectedNode.occupation && !selectedNode.company && (
+                    <p className="text-xs text-slate-500 text-center py-2">ยังไม่มีข้อมูลเพิ่มเติม</p>
                   )}
                 </div>
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-white leading-tight truncate">
-                    {selectedNode.name || "—"}
-                  </p>
-                  <p className="text-xs text-slate-400 mt-0.5">🪪 {selectedNode.id}</p>
+                <div className="bg-slate-900/50 rounded-lg p-3 text-center mb-3">
+                  <p className="text-2xl font-bold text-violet-400">{connectionCount}</p>
+                  <p className="text-xs text-slate-400">ความสัมพันธ์ที่แสดงอยู่</p>
                 </div>
+                <button
+                  onClick={() => { setSelectedNode(null); setHighlightNodes(new Set()); setHighlightLinks(new Set()); }}
+                  className="w-full text-xs text-slate-400 hover:text-slate-200 transition py-1.5 border border-slate-700 rounded-lg hover:border-slate-500">
+                  ยกเลิกการเลือก
+                </button>
               </div>
-
-              <div className="space-y-2 mb-4">
-                {selectedNode.faculty ? (
-                  <div className="flex items-start gap-2 bg-slate-900/50 rounded-lg px-3 py-2">
-                    <span className="text-sm mt-0.5">🎓</span>
-                    <div className="min-w-0">
-                      <p className="text-xs text-slate-500">คณะ</p>
-                      <p className="text-xs text-slate-200 font-medium truncate">{selectedNode.faculty}</p>
-                    </div>
-                  </div>
-                ) : null}
-                {selectedNode.department ? (
-                  <div className="flex items-start gap-2 bg-slate-900/50 rounded-lg px-3 py-2">
-                    <span className="text-sm mt-0.5">📚</span>
-                    <div className="min-w-0">
-                      <p className="text-xs text-slate-500">สาขา</p>
-                      <p className="text-xs text-slate-200 font-medium truncate">{selectedNode.department}</p>
-                    </div>
-                  </div>
-                ) : null}
-                {selectedNode.occupation ? (
-                  <div className="flex items-start gap-2 bg-slate-900/50 rounded-lg px-3 py-2">
-                    <span className="text-sm mt-0.5">💼</span>
-                    <div className="min-w-0">
-                      <p className="text-xs text-slate-500">อาชีพ / บริษัท</p>
-                      <p className="text-xs text-slate-200 font-medium truncate">{selectedNode.occupation}</p>
-                    </div>
-                  </div>
-                ) : null}
-                {!selectedNode.faculty && !selectedNode.department && !selectedNode.occupation ? (
-                  <p className="text-xs text-slate-500 text-center py-2">ยังไม่มีข้อมูลเพิ่มเติม</p>
-                ) : null}
+            ) : (
+              <div className="bg-slate-800/60 backdrop-blur border border-slate-700/50 rounded-xl p-4 flex-1 flex flex-col items-center justify-center text-center gap-2">
+                <div className="text-3xl">👆</div>
+                <p className="text-xs text-slate-400">คลิก Node เพื่อดูรายละเอียด</p>
               </div>
+            )}
 
-              <div className="bg-slate-900/50 rounded-lg p-3 text-center">
-                <p className="text-2xl font-bold text-violet-400">{connectionCount}</p>
-                <p className="text-xs text-slate-400">ความสัมพันธ์ที่แสดงอยู่</p>
+            {/* Status */}
+            <div className="bg-slate-800/60 backdrop-blur border border-slate-700/50 rounded-xl px-4 py-3 flex-shrink-0">
+              <div className="flex items-center gap-2">
+                <div className={`w-2 h-2 rounded-full ${loading ? "bg-yellow-400 animate-pulse" : error ? "bg-red-400" : "bg-green-400"}`} />
+                <p className="text-xs text-slate-400">
+                  {loading ? "กำลังโหลด..." : error ? "เชื่อมต่อไม่ได้" : "โหลดสำเร็จ • Neo4j"}
+                </p>
               </div>
-
-              <button
-                onClick={() => {
-                  setSelectedNode(null);
-                  setHighlightNodes(new Set());
-                  setHighlightLinks(new Set());
-                }}
-                className="mt-3 w-full text-xs text-slate-400 hover:text-slate-200 transition py-1 border border-slate-700 rounded-lg hover:border-slate-500"
-              >
-                ยกเลิกการเลือก
-              </button>
-            </div>
-          ) : (
-            <div className="bg-slate-800/60 backdrop-blur border border-slate-700/50 rounded-xl p-4 flex-1 flex flex-col items-center justify-center text-center gap-2">
-              <div className="text-3xl">👆</div>
-              <p className="text-xs text-slate-400">คลิก Node เพื่อดูรายละเอียด</p>
-            </div>
-          )}
-
-          {/* Status */}
-          <div className="bg-slate-800/60 backdrop-blur border border-slate-700/50 rounded-xl px-4 py-3">
-            <div className="flex items-center gap-2">
-              <div
-                className={`w-2 h-2 rounded-full ${
-                  loading
-                    ? "bg-yellow-400 animate-pulse"
-                    : error
-                    ? "bg-red-400"
-                    : "bg-green-400"
-                }`}
-              />
-              <p className="text-xs text-slate-400">
-                {loading
-                  ? "กำลังโหลด..."
-                  : error
-                  ? "เชื่อมต่อไม่ได้"
-                  : `โหลดสำเร็จ • Neo4j`}
-              </p>
             </div>
           </div>
         </div>

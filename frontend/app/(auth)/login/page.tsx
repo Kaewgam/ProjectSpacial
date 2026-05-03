@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import toast, { Toaster } from "react-hot-toast";
 import { FaEye, FaEyeSlash, FaUserGraduate } from "react-icons/fa";
+import api from "@/lib/api";
 
 export default function LoginPage() {
     const router = useRouter();
@@ -24,16 +25,11 @@ export default function LoginPage() {
         try {
             setSubmitting(true);
 
-            const res = await fetch("http://127.0.0.1:8000/api/token/", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    student_id: studentId,
-                    password: password,
-                }),
+            const res = await api.post("/api/token/", {
+                student_id: studentId,
+                password: password,
             });
-
-            const data = await res.json();
+            const data = res.data;
 
             if (!data.access) throw new Error();
 

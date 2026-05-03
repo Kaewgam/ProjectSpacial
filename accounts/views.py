@@ -12,7 +12,7 @@ from django.core.mail import send_mail
 from django.utils import timezone
 from datetime import timedelta
 from .serializers import RegisterSerializer
-from .models import User, PasswordResetToken
+from .models import User, PasswordResetToken, Faculty, Department
 from django.shortcuts import render
 
 
@@ -45,6 +45,7 @@ def search_alumni(request):
     faculty    = request.GET.get('faculty', '').strip()
     department = request.GET.get('department', '').strip()
     occupation = request.GET.get('occupation', '').strip()
+    company    = request.GET.get('company', '').strip()
     page       = int(request.GET.get('page', 1))
     page_size  = 10
 
@@ -62,15 +63,18 @@ def search_alumni(request):
 
     # กรองตามคณะ
     if faculty:
-        queryset = queryset.filter(faculty__icontains=faculty)
+        queryset = queryset.filter(faculty_ref__name__icontains=faculty)
 
     # กรองตามภาควิชา/สาขา
     if department:
-        queryset = queryset.filter(department__icontains=department)
+        queryset = queryset.filter(department_ref__name__icontains=department)
 
     # กรองตามอาชีพ/บริษัท
     if occupation:
         queryset = queryset.filter(occupation__icontains=occupation)
+        
+    if company:
+        queryset = queryset.filter(company__icontains=company)
 
     paginator = Paginator(queryset, page_size)
     page_obj  = paginator.get_page(page)
@@ -83,9 +87,10 @@ def search_alumni(request):
             "role":        user.role,
             "first_name":  user.first_name or "",
             "last_name":   user.last_name  or "",
-            "faculty":     user.faculty    or "",
-            "department":  user.department or "",
+            "faculty":     user.faculty_ref.name if user.faculty_ref else "",
+            "department":  user.department_ref.name if user.department_ref else "",
             "occupation":  user.occupation or "",
+            "company":     user.company or "",
             "date_joined": user.date_joined.strftime("%d/%m/%Y"),
             "avatar":      request.build_absolute_uri(user.avatar.url) if user.avatar else None,
         }
@@ -112,9 +117,12 @@ def me_view(request):
         "prefix": user.prefix,
         "first_name": user.first_name,
         "last_name": user.last_name,
-        "faculty": user.faculty,
-        "department": user.department,
+        "faculty": user.faculty_ref.name if user.faculty_ref else "",
+        "faculty_id": user.faculty_ref.id if user.faculty_ref else None,
+        "department": user.department_ref.name if user.department_ref else "",
+        "department_id": user.department_ref.id if user.department_ref else None,
         "occupation": user.occupation,
+        "company": user.company,
         "date_joined": user.date_joined.strftime("%d/%m/%Y"),
         "avatar": request.build_absolute_uri(user.avatar.url) if user.avatar else None,
     })
@@ -124,11 +132,34 @@ def me_view(request):
 @permission_classes([IsAuthenticated])
 def update_profile(request):
     user = request.user
-    allowed_fields = ['prefix', 'first_name', 'last_name', 'faculty', 'department', 'occupation', 'email']
+    simple_fields = ['prefix', 'first_name', 'last_name', 'occupation', 'company', 'email']
 
-    for field in allowed_fields:
+    for field in simple_fields:
         if field in request.data:
             setattr(user, field, request.data[field])
+
+    # Handle faculty FK
+    faculty_id = request.data.get('faculty_id')
+    if faculty_id:
+        try:
+            faculty_obj = Faculty.objects.get(id=faculty_id)
+            user.faculty_ref = faculty_obj
+        except Faculty.DoesNotExist:
+            pass
+    elif 'faculty_id' in request.data and not faculty_id:
+        user.faculty_ref = None
+        user.department_ref = None
+    
+    # Handle department FK
+    department_id = request.data.get('department_id')
+    if department_id:
+        try:
+            dept_obj = Department.objects.get(id=department_id)
+            user.department_ref = dept_obj
+        except Department.DoesNotExist:
+            pass
+    elif 'department_id' in request.data and not department_id:
+        user.department_ref = None
 
     user.save()
     return Response({"message": "อัปเดตข้อมูลสำเร็จ"})
@@ -204,8 +235,13 @@ def confirm_password_reset(request):
     if not token_str or not new_password:
         return Response({"error": "ข้อมูลไม่ครบถ้วน"}, status=status.HTTP_400_BAD_REQUEST)
 
-    if len(new_password) < 8:
-        return Response({"error": "รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร"}, status=status.HTTP_400_BAD_REQUEST)
+    import re
+    if len(new_password) <= 6:
+        return Response({"error": "รหัสผ่านต้องมีความยาวมากกว่า 6 ตัวอักษร"}, status=status.HTTP_400_BAD_REQUEST)
+    if not re.search(r'[A-Z]', new_password):
+        return Response({"error": "รหัสผ่านต้องมีตัวอักษรพิมพ์ใหญ่อย่างน้อย 1 ตัว"}, status=status.HTTP_400_BAD_REQUEST)
+    if not re.search(r'\d', new_password):
+        return Response({"error": "รหัสผ่านต้องมีตัวเลขอย่างน้อย 1 ตัว"}, status=status.HTTP_400_BAD_REQUEST)
 
     try:
         token_obj = PasswordResetToken.objects.get(token=token_str)
@@ -226,3 +262,36 @@ def confirm_password_reset(request):
 
 def graph_page(request):
     return render(request, "graph.html")
+
+
+# ──────────────────── Faculty & Department API ────────────────────
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def list_faculties(request):
+    """Return all faculties for dropdown."""
+    faculties = Faculty.objects.all().order_by('name')
+    data = [{"id": f.id, "name": f.name} for f in faculties]
+    return Response(data)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def list_departments(request):
+    """Return departments, optionally filtered by faculty_id."""
+    faculty_id = request.GET.get('faculty_id')
+    qs = Department.objects.select_related('faculty').order_by('name')
+    if faculty_id:
+        qs = qs.filter(faculty_id=faculty_id)
+    data = [
+        {
+            "id": d.id,
+            "name": d.name,
+            "short_name": d.short_name,
+            "code": d.code,
+            "faculty_id": d.faculty_id,
+            "faculty_name": d.faculty.name,
+        }
+        for d in qs
+    ]
+    return Response(data)
