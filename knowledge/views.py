@@ -1,3 +1,5 @@
+from django.db.models import Count, Q
+from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
@@ -20,10 +22,12 @@ def comment_to_dict(comment, request):
         'id': comment.id,
         'post_id': comment.post_id,
         'content': comment.content,
-        'created_at': comment.created_at.strftime('%d/%m/%Y %H:%M'),
+        'created_at': timezone.localtime(comment.created_at).strftime('%d/%m/%Y %H:%M'),
         'author': get_author_info(comment.author) if comment.author else None,
         'parent_id': comment.parent_id,
     }
+    # For a detail view with prefetch, we should ideally use the prefetched related objects to avoid N+1 here too.
+    # But since this is only for one post (detail), it's less critical. 
     replies = comment.replies.filter(is_active=True)
     if replies.exists():
         data['replies'] = [comment_to_dict(r, request) for r in replies]
@@ -35,10 +39,10 @@ def post_to_dict(post, request, include_comments=False):
         'title': post.title,
         'description': post.description,
         'url': post.url,
-        'created_at': post.created_at.strftime('%d/%m/%Y %H:%M'),
+        'created_at': timezone.localtime(post.created_at).strftime('%d/%m/%Y %H:%M'),
         'is_active': post.is_active,
         'author': get_author_info(post.author) if post.author else None,
-        'comment_count': post.comments.filter(is_active=True).count(),
+        'comment_count': getattr(post, 'comment_count_annotated', post.comments.filter(is_active=True).count()),
     }
     if include_comments:
         data['comments'] = [comment_to_dict(c, request) for c in post.comments.filter(is_active=True, parent__isnull=True)]
@@ -48,15 +52,18 @@ def post_to_dict(post, request, include_comments=False):
 @permission_classes([AllowAny])
 def knowledge_post_list(request):
     if request.method == 'GET':
+        qs = KnowledgePost.objects.select_related('author')
         if request.user.is_authenticated and request.user.role == 'ADMIN':
-            qs = KnowledgePost.objects.all()
+            qs = qs.all()
         else:
-            qs = KnowledgePost.objects.filter(is_active=True)
+            qs = qs.filter(is_active=True)
             
         q = request.GET.get('q')
         if q:
-            qs = qs.filter(title__icontains=q) | qs.filter(description__icontains=q)
+            qs = qs.filter(Q(title__icontains=q) | Q(description__icontains=q))
             
+        qs = qs.annotate(comment_count_annotated=Count('comments', filter=Q(comments__is_active=True)))
+        
         page = int(request.GET.get('page', 1))
         limit = int(request.GET.get('limit', 12))
         paginator = Paginator(qs, limit)
@@ -94,7 +101,10 @@ def knowledge_post_list(request):
 @permission_classes([AllowAny])
 def knowledge_post_detail(request, post_id):
     try:
-        post = KnowledgePost.objects.get(id=post_id)
+        post = KnowledgePost.objects.select_related('author').prefetch_related(
+            'comments__author',
+            'comments__replies__author'
+        ).get(id=post_id)
     except KnowledgePost.DoesNotExist:
         return Response({'error': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
         

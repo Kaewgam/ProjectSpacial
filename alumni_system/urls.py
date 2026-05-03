@@ -30,7 +30,7 @@ from accounts.views_admin import (
     admin_neo4j_cleanup, admin_neo4j_syncall, admin_neo4j_status,
     admin_create_user, admin_neo4j_audit,
 )
-from posts.views import post_list, post_detail
+from posts.views import post_list, post_detail, category_list
 
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
@@ -61,6 +61,7 @@ urlpatterns = [
     path('api/admin/neo4j/audit/', admin_neo4j_audit),
     # ── Post API ──
     path('api/posts/', post_list),
+    path('api/posts/categories/', category_list),
     path('api/posts/<uuid:post_id>/', post_detail),
     # ── Faculty & Department API ──
     path('api/faculties/', list_faculties),

@@ -21,18 +21,21 @@ interface Post {
   cover_image: string | null;
 }
 
-const CATEGORY_STYLES: Record<Post["category"], { bg: string; text: string; border: string; dot: string }> = {
-  ประกาศ:   { bg: "bg-violet-50",  text: "text-violet-700",  border: "border-violet-200",  dot: "#7c3aed" },
-  กิจกรรม:  { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200", dot: "#059669" },
-  ข่าวสาร:  { bg: "bg-sky-50",     text: "text-sky-700",     border: "border-sky-200",     dot: "#0284c7" },
-  ประกาศสมัครงาน: { bg: "bg-amber-50",   text: "text-amber-700",   border: "border-amber-200",   dot: "#d97706" },
-};
+interface CategoryDef {
+  id: string;
+  value: string;
+  label: string;
+  icon: string;
+  bg: string;
+  text: string;
+  border: string;
+  dot: string;
+}
 
-const ALL_CATEGORIES = ["ทั้งหมด", "ประกาศ", "กิจกรรม", "ข่าวสาร", "ประกาศสมัครงาน"] as const;
 
 // ─── Sub Components ───────────────────────────────────
-function PinnedCard({ item, onClick }: { item: Post; onClick: () => void }) {
-  const style = CATEGORY_STYLES[item.category] || { bg: "bg-gray-50", text: "text-gray-700", border: "border-gray-200", dot: "#6b7280" };
+function PinnedCard({ item, onClick, styleMap }: { item: Post; onClick: () => void; styleMap: Record<string, any> }) {
+  const style = styleMap[item.category] || { bg: "bg-gray-50", text: "text-gray-700", border: "border-gray-200", dot: "#6b7280" };
   return (
     <div 
       onClick={onClick}
@@ -74,8 +77,8 @@ function PinnedCard({ item, onClick }: { item: Post; onClick: () => void }) {
   );
 }
 
-function NewsCard({ item, onClick }: { item: Post; onClick: () => void }) {
-  const style = CATEGORY_STYLES[item.category] || { bg: "bg-gray-50", text: "text-gray-700", border: "border-gray-200", dot: "#6b7280" };
+function NewsCard({ item, onClick, styleMap }: { item: Post; onClick: () => void; styleMap: Record<string, any> }) {
+  const style = styleMap[item.category] || { bg: "bg-gray-50", text: "text-gray-700", border: "border-gray-200", dot: "#6b7280" };
   return (
     <div 
       onClick={onClick}
@@ -119,6 +122,9 @@ export default function Home() {
   const searchParams = useSearchParams();
 
   const [activeCategory, setActiveCategory] = useState<string>("ทั้งหมด");
+  const [categories, setCategories] = useState<CategoryDef[]>([]);
+  const [styleMap, setStyleMap] = useState<Record<string, any>>({});
+  const [allCategoriesList, setAllCategoriesList] = useState<string[]>(["ทั้งหมด"]);
   const [pinned,   setPinned]   = useState<Post[]>([]);
   const [posts,    setPosts]    = useState<Post[]>([]);
   const [loading,  setLoading]  = useState(true);
@@ -149,15 +155,25 @@ export default function Home() {
 
   useEffect(() => { fetchPinned(); }, [fetchPinned]);
 
-  // อ่าน ?cat= จาก URL (จากการคลิก Navbar)
   useEffect(() => {
-    const cat = searchParams.get("cat");
-    const valid = ["ประกาศ", "กิจกรรม", "ข่าวสาร", "ประกาศสมัครงาน"];
-    if (cat && valid.includes(cat)) {
-      setActiveCategory(cat);
-    } else {
-      setActiveCategory("ทั้งหมด");
-    }
+    api.get("/api/posts/categories/").then(res => {
+      setCategories(res.data);
+      const map: Record<string, any> = {};
+      const valid: string[] = [];
+      res.data.forEach((c: CategoryDef) => {
+        map[c.value] = c;
+        valid.push(c.value);
+      });
+      setStyleMap(map);
+      setAllCategoriesList(["ทั้งหมด", ...valid]);
+      
+      const cat = searchParams.get("cat");
+      if (cat && valid.includes(cat)) {
+        setActiveCategory(cat);
+      } else {
+        setActiveCategory("ทั้งหมด");
+      }
+    }).catch(console.error);
   }, [searchParams]);
 
   useEffect(() => {
@@ -208,7 +224,7 @@ export default function Home() {
             </div>
             <div className="grid md:grid-cols-2 gap-4">
               {pinned.map((item) => (
-                <PinnedCard key={item.id} item={item} onClick={() => setSelectedPost(item)} />
+                <PinnedCard key={item.id} item={item} onClick={() => setSelectedPost(item)} styleMap={styleMap} />
               ))}
             </div>
           </div>
@@ -222,11 +238,11 @@ export default function Home() {
           </div>
 
           {/* Category Filter */}
-          <div className="flex gap-2 flex-wrap mb-6">
-            {ALL_CATEGORIES.map((cat) => (
+          <div className="flex flex-wrap gap-2 mb-8">
+            {allCategoriesList.map((cat) => (
               <button
                 key={cat}
-                onClick={() => setActiveCategory(cat)}
+                onClick={() => { setActiveCategory(cat); setPage(1); }}
                 className={`text-sm px-4 py-1.5 rounded-full border transition-all font-medium ${
                   activeCategory === cat
                     ? "bg-violet-600 border-violet-600 text-white shadow-sm"
@@ -248,7 +264,7 @@ export default function Home() {
           ) : posts.length > 0 ? (
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
               {posts.map((item) => (
-                <NewsCard key={item.id} item={item} onClick={() => setSelectedPost(item)} />
+                <NewsCard key={item.id} item={item} onClick={() => setSelectedPost(item)} styleMap={styleMap} />
               ))}
             </div>
           ) : (
@@ -285,16 +301,14 @@ export default function Home() {
       </div>
 
       {/* ─── Post Modal ─── */}
-      {selectedPost && (
-        <PostModal post={selectedPost} isAdmin={isAdmin} onClose={() => setSelectedPost(null)} />
-      )}
+      {selectedPost && <PostModal post={selectedPost} isAdmin={isAdmin} onClose={() => setSelectedPost(null)} styleMap={styleMap} />}
     </div>
   );
 }
 
 // ─── Modal Component ───────────────────────────────────
-function PostModal({ post, isAdmin, onClose }: { post: Post; isAdmin?: boolean; onClose: () => void }) {
-  const style = CATEGORY_STYLES[post.category] || { bg: "bg-gray-50", text: "text-gray-700", border: "border-gray-200", dot: "#6b7280" };
+function PostModal({ post, isAdmin, onClose, styleMap }: { post: Post; isAdmin?: boolean; onClose: () => void; styleMap: Record<string, any> }) {
+  const style = styleMap[post.category] || { bg: "bg-gray-50", text: "text-gray-700", border: "border-gray-200", dot: "#6b7280" };
   
   useEffect(() => {
     document.body.style.overflow = "hidden";

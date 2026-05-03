@@ -10,15 +10,15 @@ import {
 import api from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 
-// ─── Types ───────────────────────────────────────────
-type Category = "ประกาศ" | "กิจกรรม" | "ข่าวสาร" | "ประกาศสมัครงาน";
-
-const CATEGORIES: { value: Category; label: string; icon: string; color: string; border: string; bg: string }[] = [
-  { value: "ประกาศ",   label: "ประกาศ",    icon: "📢", color: "text-violet-700",  border: "border-violet-300",  bg: "bg-violet-50"  },
-  { value: "กิจกรรม",  label: "กิจกรรม",   icon: "📅", color: "text-emerald-700", border: "border-emerald-300", bg: "bg-emerald-50" },
-  { value: "ข่าวสาร",  label: "ข่าวสาร",   icon: "🗞️", color: "text-sky-700",     border: "border-sky-300",     bg: "bg-sky-50"     },
-  { value: "ประกาศสมัครงาน", label: "ประกาศสมัครงาน",  icon: "💼", color: "text-amber-700",   border: "border-amber-300",   bg: "bg-amber-50"   },
-];
+// ─── Types ────────────────────────────────────────────────────
+interface CategoryDef {
+  value: string;
+  label: string;
+  icon: string;
+  text: string;
+  border: string;
+  bg: string;
+}
 
 function CharCounter({ current, max, warn = 0.8 }: { current: number; max: number; warn?: number }) {
   const ratio = current / max;
@@ -45,7 +45,8 @@ export default function EditPostPage() {
   const [loadingInitial, setLoadingInitial] = useState(true);
   
   const [title, setTitle]       = useState("");
-  const [category, setCategory] = useState<Category | "">("");
+  const [category, setCategory] = useState("");
+  const [categories, setCategories] = useState<CategoryDef[]>([]);
   const [excerpt, setExcerpt]   = useState("");
   const [content, setContent]   = useState("");
   const [author, setAuthor]     = useState("");
@@ -66,6 +67,11 @@ export default function EditPostPage() {
       router.replace("/");
     }
   }, [user, authLoading, router]);
+
+  // ── ดึง Categories จาก API ──
+  useEffect(() => {
+    api.get("/api/posts/categories/").then(res => setCategories(res.data)).catch(console.error);
+  }, []);
 
   // ── Load Initial Data ──
   useEffect(() => {
@@ -231,14 +237,14 @@ export default function EditPostPage() {
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
           <Label icon={<Tag size={15} />} text="หมวดหมู่" required />
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {CATEGORIES.map((cat) => (
+            {categories.map((cat) => (
               <button
                 key={cat.value}
                 type="button"
                 onClick={() => setCategory(cat.value)}
                 className={`flex flex-col items-center gap-2 py-3 px-2 rounded-xl border-2 text-sm font-medium transition-all ${
                   category === cat.value
-                    ? `${cat.bg} ${cat.border} ${cat.color}`
+                    ? `${cat.bg} ${cat.border} ${cat.text}`
                     : "border-gray-200 text-gray-500 hover:border-gray-300 hover:bg-gray-50"
                 }`}
               >

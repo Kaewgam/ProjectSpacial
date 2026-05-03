@@ -22,12 +22,8 @@ interface Post {
   excerpt:     string;
 }
 
-const CATEGORY_COLORS: Record<string, string> = {
-  "ประกาศ":   "bg-violet-50 text-violet-700 border-violet-200",
-  "กิจกรรม":  "bg-emerald-50 text-emerald-700 border-emerald-200",
-  "ข่าวสาร":  "bg-sky-50 text-sky-700 border-sky-200",
-  "ประกาศสมัครงาน": "bg-amber-50 text-amber-700 border-amber-200",
-};
+const DEFAULT_CAT_STYLE = "bg-gray-50 text-gray-600 border-gray-200";
+
 
 export default function AdminPostsPage() {
   const { user, loading: authLoading } = useAuth();
@@ -40,11 +36,23 @@ export default function AdminPostsPage() {
   const [total,      setTotal]      = useState(0);
   const [deleting,   setDeleting]   = useState<string | null>(null);
   const [confirm,    setConfirm]    = useState<string | null>(null);
+  const [catColors,  setCatColors]  = useState<Record<string, string>>({});
 
   // Guard
   useEffect(() => {
     if (!authLoading && (!user || user.role !== "ADMIN")) router.replace("/");
   }, [user, authLoading, router]);
+
+  // ดึง categories จาก API
+  useEffect(() => {
+    api.get("/api/posts/categories/").then(res => {
+      const map: Record<string, string> = {};
+      res.data.forEach((c: any) => {
+        map[c.value] = `${c.bg} ${c.text} ${c.border}`;
+      });
+      setCatColors(map);
+    }).catch(console.error);
+  }, []);
 
   const fetchPosts = useCallback(async (p: number) => {
     setLoading(true);
@@ -177,7 +185,7 @@ export default function AdminPostsPage() {
 
                   {/* Category */}
                   <div className="col-span-2">
-                    <span className={`text-xs font-semibold border px-2 py-0.5 rounded-full ${CATEGORY_COLORS[post.category] || "bg-gray-50 text-gray-600 border-gray-200"}`}>
+                    <span className={`text-xs font-semibold border px-2 py-0.5 rounded-full ${catColors[post.category] || DEFAULT_CAT_STYLE}`}>
                       {post.category}
                     </span>
                   </div>

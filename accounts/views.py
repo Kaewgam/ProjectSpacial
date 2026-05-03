@@ -49,8 +49,8 @@ def search_alumni(request):
     page       = int(request.GET.get('page', 1))
     page_size  = 10
 
-    # แสดงเฉพาะ ALUMNI เสมอ
-    queryset = User.objects.filter(role='ALUMNI').order_by('student_id')
+    # แสดงเฉพาะ ALUMNI เสมอ และดึงข้อมูล faculty/department มาพร้อมกันเพื่อลด N+1 Query
+    queryset = User.objects.filter(role='ALUMNI').select_related('faculty_ref', 'department_ref').order_by('student_id')
 
     # ค้นหาทั่วไป (ชื่อ, รหัส, อีเมล)
     if q:
@@ -91,7 +91,7 @@ def search_alumni(request):
             "department":  user.department_ref.name if user.department_ref else "",
             "occupation":  user.occupation or "",
             "company":     user.company or "",
-            "date_joined": user.date_joined.strftime("%d/%m/%Y"),
+            "date_joined": timezone.localtime(user.date_joined).strftime("%d/%m/%Y"),
             "avatar":      request.build_absolute_uri(user.avatar.url) if user.avatar else None,
         }
         for user in page_obj
@@ -123,7 +123,7 @@ def me_view(request):
         "department_id": user.department_ref.id if user.department_ref else None,
         "occupation": user.occupation,
         "company": user.company,
-        "date_joined": user.date_joined.strftime("%d/%m/%Y"),
+        "date_joined": timezone.localtime(user.date_joined).strftime("%d/%m/%Y"),
         "avatar": request.build_absolute_uri(user.avatar.url) if user.avatar else None,
     })
 

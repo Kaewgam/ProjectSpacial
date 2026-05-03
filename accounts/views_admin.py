@@ -63,10 +63,15 @@ def admin_stats(request):
         .order_by("-count")[:5]
     )
 
-    # Neo4j node count
+    # Neo4j node count — ตั้ง timeout สั้นๆ เพื่อไม่ให้รอนานถ้า Neo4j ปิดอยู่
     neo4j_stats = {"nodes": 0, "relationships": 0, "connected": False, "companies": 0, "departments": 0}
     try:
-        driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
+        driver = GraphDatabase.driver(
+            NEO4J_URI,
+            auth=(NEO4J_USER, NEO4J_PASSWORD),
+            connection_timeout=3,       # รอ connect สูงสุด 3 วินาที
+            max_transaction_retry_time=3,
+        )
         with driver.session() as session:
             res = session.run("MATCH (n) RETURN count(n) AS cnt")
             neo4j_stats["nodes"] = res.single()["cnt"]
@@ -79,19 +84,28 @@ def admin_stats(request):
             neo4j_stats["connected"] = True
         driver.close()
     except Exception:
-        pass
+        pass  # Neo4j ปิดอยู่ → แสดงว่า "ขัดข้อง" โดยไม่ค้างนาน
 
-    # Generation stats (รุ่น)
-    gen_counts = {}
-    users_with_id = alumni.exclude(student_id="")
-    for u in users_with_id:
-        gen = str(u.student_id)[:2]
-        if gen.isdigit():
-            gen_counts[gen] = gen_counts.get(gen, 0) + 1
-    
-    # Sort by generation descending (e.g. 65, 64, 63)
-    sorted_gens = sorted(gen_counts.items(), key=lambda x: x[0], reverse=True)
-    generation_stats = [{"generation": g, "count": c} for g, c in sorted_gens[:5]]
+    # Generation stats — ใช้ SQL ใน PostgreSQL แทนการวน Loop ใน Python
+    from django.db.models.functions import Left, Cast
+    from django.db.models import CharField
+    from django.db.models import Value
+    import re
+
+    gen_qs = (
+        alumni
+        .exclude(student_id__isnull=True)
+        .exclude(student_id="")
+        .annotate(gen=Left(Cast('student_id', output_field=CharField()), 2))
+        .values('gen')
+        .annotate(count=Count('id'))
+        .order_by('-gen')[:5]
+    )
+    generation_stats = [
+        {"generation": row['gen'], "count": row['count']}
+        for row in gen_qs
+        if row['gen'] and row['gen'].isdigit()
+    ]
 
     return Response({
         "total_users": total_users,
@@ -122,7 +136,7 @@ def admin_users_list(request):
     page = int(request.GET.get("page", 1))
     page_size = 15
 
-    queryset = User.objects.all().order_by("-date_joined")
+    queryset = User.objects.select_related('faculty_ref', 'department_ref').all().order_by("-date_joined")
 
     if q:
         queryset = queryset.filter(
@@ -157,7 +171,7 @@ def admin_users_list(request):
             "occupation": u.occupation,
             "company": u.company,
             "is_active": u.is_active,
-            "date_joined": u.date_joined.strftime("%d/%m/%Y %H:%M"),
+            "date_joined": timezone.localtime(u.date_joined).strftime("%d/%m/%Y %H:%M"),
             "avatar": request.build_absolute_uri(u.avatar.url) if u.avatar else None,
         }
         for u in page_obj

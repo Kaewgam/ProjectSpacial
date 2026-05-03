@@ -4,8 +4,9 @@ from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.response import Response
 from rest_framework import status
 from django.core.paginator import Paginator
+from django.utils import timezone
 
-from .models import Post
+from .models import Post, Category
 
 
 def is_admin(request):
@@ -18,12 +19,12 @@ def post_to_dict(post, request):
         'title':       post.title,
         'excerpt':     post.excerpt,
         'content':     post.content,
-        'category':    post.category,
+        'category':    post.category.name if post.category else None,
         'author':      post.author,
         'pinned':      post.pinned,
         'is_active':   post.is_active,
-        'created_at':  post.created_at.strftime('%d/%m/%Y'),
-        'updated_at':  post.updated_at.strftime('%d/%m/%Y %H:%M'),
+        'created_at':  timezone.localtime(post.created_at).strftime('%d/%m/%Y'),
+        'updated_at':  timezone.localtime(post.updated_at).strftime('%d/%m/%Y %H:%M'),
         'cover_image': request.build_absolute_uri(post.cover_image.url) if post.cover_image else None,
         'created_by':  post.created_by.student_id if post.created_by else None,
     }
@@ -36,15 +37,16 @@ def post_to_dict(post, request):
 @parser_classes([MultiPartParser, FormParser, JSONParser])
 def post_list(request):
     if request.method == 'GET':
+        qs = Post.objects.select_related('created_by')
         if is_admin(request):
-            qs = Post.objects.all()
+            pass # Keep qs as all() with select_related
         else:
-            qs = Post.objects.filter(is_active=True)
+            qs = qs.filter(is_active=True)
 
         # filter by category
         category = request.GET.get('category')
         if category:
-            qs = qs.filter(category=category)
+            qs = qs.filter(category__name=category)
 
         # search
         q = request.GET.get('q')
@@ -75,22 +77,29 @@ def post_list(request):
 
     title    = (request.data.get('title') or '').strip()
     content  = (request.data.get('content') or '').strip()
-    category = (request.data.get('category') or '').strip()
+    category_name = (request.data.get('category') or '').strip()
 
     errors = {}
     if not title:    errors['title']    = 'กรุณากรอกหัวข้อ'
     if not content:  errors['content']  = 'กรุณากรอกเนื้อหา'
-    valid_cats = [c[0] for c in Post.CATEGORY_CHOICES]
-    if not category or category not in valid_cats:
-        errors['category'] = 'หมวดหมู่ไม่ถูกต้อง'
+    
+    cat_obj = None
+    if not category_name:
+        errors['category'] = 'กรุณาเลือกหมวดหมู่'
+    else:
+        try:
+            cat_obj = Category.objects.get(name=category_name)
+        except Category.DoesNotExist:
+            errors['category'] = 'หมวดหมู่ไม่ถูกต้อง'
+            
     if errors:
         return Response({'errors': errors}, status=status.HTTP_400_BAD_REQUEST)
 
     post = Post(
-        title      = title[:120],
-        excerpt    = (request.data.get('excerpt') or '')[:200],
-        content    = content[:5000],
-        category   = category,
+        title      = title,
+        excerpt    = (request.data.get('excerpt') or ''),
+        content    = content,
+        category   = cat_obj,
         author     = (request.data.get('author') or '').strip()[:100],
         pinned     = request.data.get('pinned') in [True, 'true', '1'],
         created_by = request.user,
@@ -121,9 +130,16 @@ def post_detail(request, post_id):
         return Response({'error': 'ไม่มีสิทธิ์'}, status=status.HTTP_403_FORBIDDEN)
 
     if request.method == 'PATCH':
-        for field in ['title', 'excerpt', 'content', 'category', 'author']:
+        for field in ['title', 'excerpt', 'content', 'author']:
             if field in request.data:
                 setattr(post, field, request.data[field])
+        if 'category' in request.data:
+            cat_name = request.data['category']
+            try:
+                cat_obj = Category.objects.get(name=cat_name)
+                post.category = cat_obj
+            except Category.DoesNotExist:
+                return Response({'error': 'หมวดหมู่ไม่ถูกต้อง'}, status=status.HTTP_400_BAD_REQUEST)
         if 'pinned' in request.data:
             post.pinned = request.data['pinned'] in [True, 'true', '1']
         if 'is_active' in request.data:
@@ -136,3 +152,21 @@ def post_detail(request, post_id):
     if request.method == 'DELETE':
         post.delete()
         return Response({'message': 'ลบโพสต์สำเร็จ'})
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def category_list(request):
+    cats = Category.objects.all()
+    data = []
+    for c in cats:
+        data.append({
+            'id': c.id,
+            'value': c.name,
+            'label': c.name,
+            'icon': c.icon,
+            'bg': c.color_bg,
+            'text': c.color_text,
+            'border': c.color_border,
+            'dot': c.color_dot,
+        })
+    return Response(data)

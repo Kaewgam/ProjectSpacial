@@ -8,7 +8,12 @@ URI = os.getenv("NEO4J_URI", "bolt://localhost:7687")
 USER = os.getenv("NEO4J_USER", "neo4j")
 PASSWORD = os.getenv("NEO4J_PASSWORD", "")
 
-driver = GraphDatabase.driver(URI, auth=(USER, PASSWORD))
+driver = GraphDatabase.driver(
+    URI, 
+    auth=(USER, PASSWORD),
+    connection_timeout=3,
+    max_transaction_retry_time=3
+)
 
 
 def sync_user_to_neo4j(user):

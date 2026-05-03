@@ -123,7 +123,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'Asia/Bangkok'
 
 USE_I18N = True
 
@@ -150,17 +150,11 @@ SIMPLE_JWT = {
 }
 
 # ─── Email Configuration ───
-# สำหรับ Development: print email ใน terminal แทนส่งจริง
-# เปลี่ยนเป็น 'django.core.mail.backends.smtp.EmailBackend' สำหรับ Production
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
-DEFAULT_FROM_EMAIL = 'Alumni System <noreply@alumni.example.com>'
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'Topzaxzax123@gmail.com'      # TODO: ใส่อีเมล Gmail ของคุณที่นี่
+EMAIL_HOST_PASSWORD = 'yemefnvwqfsouvdg'      # รหัสผ่าน App Password ของคุณ
+DEFAULT_FROM_EMAIL = 'Alumni System <Topzaxzax123@gmail.com>' # TODO: ใส่อีเมล Gmail ของคุณที่นี่
 FRONTEND_URL = 'http://localhost:3000'
-
-# ─── SMTP Settings (สำหรับ Production) ───
-# EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-# EMAIL_HOST = 'smtp.gmail.com'
-# EMAIL_PORT = 587
-# EMAIL_USE_TLS = True
-# EMAIL_HOST_USER = 'your-email@gmail.com'
-# EMAIL_HOST_PASSWORD = 'your-app-password'
-
