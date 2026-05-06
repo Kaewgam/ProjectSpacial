@@ -23,31 +23,20 @@ export default function ProfilePage() {
     const [pendingAvatarFile, setPendingAvatarFile] = useState<File | null>(null);
     const [pendingAvatarPreview, setPendingAvatarPreview] = useState<string | null>(null);
 
-    // Faculty / Department — shared hook (cached)
-    const [filteredDepts, setFilteredDepts] = useState<{ id: number; name: string; faculty_id: number }[]>([]);
     const { faculties, departments } = useFacultyDept();
 
     const [form, setForm] = useState({
-        prefix: "", first_name: "", last_name: "",
-        email: "", faculty_id: null as number | null, department_id: null as number | null,
-        occupation: "", company: "",
+        prefix: "", first_name: "", last_name: "", email: "",
+        educations: [] as { faculty_id: string | null, department_id: string | null, degree_level: string, graduation_year: string }[],
+        careers: [] as { occupation: string, company: string, is_current: boolean, start_year: string, end_year: string }[],
     });
-
-    // Filter departments when faculty changes
-    useEffect(() => {
-        if (form.faculty_id) {
-            setFilteredDepts(departments.filter(d => d.faculty_id === form.faculty_id));
-        } else {
-            setFilteredDepts([]);
-        }
-    }, [form.faculty_id, departments]);
 
     // Protected route
     useEffect(() => {
         if (!loading && !user) router.push("/login");
     }, [user, loading, router]);
 
-    // Sync form from user (use IDs)
+    // Sync form from user
     useEffect(() => {
         if (user) {
             setForm({
@@ -55,10 +44,19 @@ export default function ProfilePage() {
                 first_name: user.first_name ?? "",
                 last_name: user.last_name ?? "",
                 email: user.email ?? "",
-                faculty_id: (user as any).faculty_id ?? null,
-                department_id: (user as any).department_id ?? null,
-                occupation: user.occupation ?? "",
-                company: user.company ?? "",
+                educations: user.educations && user.educations.length > 0 ? user.educations.map(e => ({
+                    faculty_id: e.faculty_id ? String(e.faculty_id) : null,
+                    department_id: e.department_id ? String(e.department_id) : null,
+                    degree_level: e.degree_level || "",
+                    graduation_year: e.graduation_year || ""
+                })) : [{ faculty_id: null, department_id: null, degree_level: "", graduation_year: "" }],
+                careers: user.careers && user.careers.length > 0 ? user.careers.map(c => ({
+                    occupation: c.occupation || "",
+                    company: c.company || "",
+                    is_current: c.is_current ?? true,
+                    start_year: c.start_year || "",
+                    end_year: c.end_year || ""
+                })) : [{ occupation: "", company: "", is_current: true, start_year: "", end_year: "" }],
             });
         }
     }, [user]);
@@ -80,16 +78,14 @@ export default function ProfilePage() {
                 setPendingAvatarFile(null);
                 setPendingAvatarPreview(null);
             }
-            // 2. ส่งข้อมูลรวม faculty_id / department_id
+            // 2. ส่งข้อมูล array ของการศึกษาและอาชีพ
             await api.patch("/api/me/update/", {
                 prefix: form.prefix,
                 first_name: form.first_name,
                 last_name: form.last_name,
                 email: form.email,
-                occupation: form.occupation,
-                company: form.company,
-                faculty_id: form.faculty_id,
-                department_id: form.department_id,
+                educations: form.educations,
+                careers: form.careers,
             });
             // 3. ดึง user ใหม่ → Navbar + ทุกที่อัปเดตทันที
             await refreshUser();
@@ -107,9 +103,15 @@ export default function ProfilePage() {
             setForm({
                 prefix: user.prefix ?? "", first_name: user.first_name ?? "",
                 last_name: user.last_name ?? "", email: user.email ?? "",
-                faculty_id: (user as any).faculty_id ?? null,
-                department_id: (user as any).department_id ?? null,
-                occupation: user.occupation ?? "", company: user.company ?? "",
+                educations: user.educations && user.educations.length > 0 ? user.educations.map(e => ({
+                    faculty_id: e.faculty_id ? String(e.faculty_id) : null,
+                    department_id: e.department_id ? String(e.department_id) : null,
+                    degree_level: e.degree_level || "", graduation_year: e.graduation_year || ""
+                })) : [{ faculty_id: null, department_id: null, degree_level: "", graduation_year: "" }],
+                careers: user.careers && user.careers.length > 0 ? user.careers.map(c => ({
+                    occupation: c.occupation || "", company: c.company || "",
+                    is_current: c.is_current ?? true, start_year: c.start_year || "", end_year: c.end_year || ""
+                })) : [{ occupation: "", company: "", is_current: true, start_year: "", end_year: "" }],
             });
         }
         setPendingAvatarFile(null);
@@ -295,77 +297,195 @@ export default function ProfilePage() {
                                     }
                                 </div>
 
-                                {/* อาชีพ (ตำแหน่ง) */}
-                                {user.role !== "ADMIN" && (
-                                    <div>
-                                        <p className="text-xs text-gray-400 mb-1">ตำแหน่ง</p>
-                                        {editMode
-                                            ? <input value={form.occupation} onChange={(e) => set("occupation", e.target.value)} placeholder="เช่น วิศวกร" className={inputClass} />
-                                            : <p className="text-gray-800 font-medium text-sm">{user.occupation || "—"}</p>
-                                        }
-                                    </div>
-                                )}
-                                
-                                {/* หน่วยงาน สังกัด */}
-                                {user.role !== "ADMIN" && (
-                                    <div>
-                                        <p className="text-xs text-gray-400 mb-1">หน่วยงาน / สังกัด</p>
-                                        {editMode
-                                            ? <input value={form.company} onChange={(e) => set("company", e.target.value)} placeholder="เช่น บริษัท, โรงงาน, สถาบัน" className={inputClass} />
-                                            : <p className="text-gray-800 font-medium text-sm">{user.company || "—"}</p>
-                                        }
-                                    </div>
-                                )}
                             </div>
                         </div>
 
                         {/* ข้อมูลการศึกษา */}
                         {user.role !== "ADMIN" && (
                             <div className="bg-white rounded-2xl shadow-md p-6 mt-6">
-                                <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                                    <GraduationCap size={18} className="text-[#414E51]" /> ข้อมูลการศึกษา
-                                </h2>
-                                <div className="grid sm:grid-cols-2 gap-4">
-                                    {/* คณะ */}
-                                    <div>
-                                        <p className="text-xs text-gray-400 mb-1">คณะ</p>
-                                        {editMode ? (
-                                            <select
-                                                value={form.faculty_id ?? ""}
-                                                onChange={(e) => {
-                                                    const id = e.target.value ? Number(e.target.value) : null;
-                                                    setForm(prev => ({ ...prev, faculty_id: id, department_id: null }));
-                                                }}
-                                                className={selectClass}
-                                            >
-                                                <option value="">เลือกคณะ</option>
-                                                {faculties.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
-                                            </select>
-                                        ) : (
-                                            <p className="text-gray-800 font-medium text-sm">{user.faculty || "—"}</p>
-                                        )}
-                                    </div>
+                                <div className="flex items-center justify-between mb-4">
+                                    <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                                        <GraduationCap size={18} className="text-[#414E51]" /> ประวัติการศึกษา
+                                    </h2>
+                                </div>
+                                <div className="space-y-4">
+                                    {form.educations.map((edu, idx) => {
+                                        const eduFilteredDepts = departments.filter(d => String(d.faculty_id) === String(edu.faculty_id));
+                                        return (
+                                            <div key={idx} className="relative bg-gray-50 p-4 rounded-xl border border-gray-200">
+                                                {editMode && (
+                                                    <button onClick={() => setForm(p => ({ ...p, educations: p.educations.filter((_, i) => i !== idx) }))}
+                                                        className="absolute top-3 right-3 text-red-500 hover:text-red-700 bg-red-50 p-1.5 rounded-lg transition" title="ลบข้อมูลนี้">
+                                                        <X size={16} />
+                                                    </button>
+                                                )}
+                                                <div className="grid sm:grid-cols-2 gap-4">
+                                                    <div>
+                                                        <p className="text-xs text-gray-400 mb-1">คณะ</p>
+                                                        {editMode ? (
+                                                            <select value={edu.faculty_id ?? ""} onChange={(e) => {
+                                                                const newEdu = [...form.educations];
+                                                                newEdu[idx].faculty_id = e.target.value ? String(e.target.value) : null;
+                                                                newEdu[idx].department_id = null;
+                                                                setForm(p => ({ ...p, educations: newEdu }));
+                                                            }} className={selectClass}>
+                                                                <option value="">เลือกคณะ</option>
+                                                                {faculties.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+                                                            </select>
+                                                        ) : (
+                                                            <p className="text-gray-800 font-medium text-sm">{faculties.find(f => String(f.id) === String(edu.faculty_id))?.name || "—"}</p>
+                                                        )}
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-xs text-gray-400 mb-1">สาขาวิชา</p>
+                                                        {editMode ? (
+                                                            <select value={edu.department_id ?? ""} onChange={(e) => {
+                                                                const newEdu = [...form.educations];
+                                                                newEdu[idx].department_id = e.target.value ? String(e.target.value) : null;
+                                                                setForm(p => ({ ...p, educations: newEdu }));
+                                                            }} disabled={!edu.faculty_id} className={`${selectClass} ${!edu.faculty_id ? "opacity-50 cursor-not-allowed" : ""}`}>
+                                                                <option value="">เลือกสาขาวิชา</option>
+                                                                {eduFilteredDepts.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                                                            </select>
+                                                        ) : (
+                                                            <p className="text-gray-800 font-medium text-sm">{departments.find(d => String(d.id) === String(edu.department_id))?.name || "—"}</p>
+                                                        )}
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-xs text-gray-400 mb-1">ระดับปริญญา</p>
+                                                        {editMode ? (
+                                                            <select value={edu.degree_level} onChange={(e) => {
+                                                                const newEdu = [...form.educations];
+                                                                newEdu[idx].degree_level = e.target.value;
+                                                                setForm(p => ({ ...p, educations: newEdu }));
+                                                            }} className={selectClass}>
+                                                                <option value="">เลือก...</option>
+                                                                <option value="ปริญญาตรี">ปริญญาตรี</option>
+                                                                <option value="ปริญญาโท">ปริญญาโท</option>
+                                                                <option value="ปริญญาเอก">ปริญญาเอก</option>
+                                                            </select>
+                                                        ) : (
+                                                            <p className="text-gray-800 font-medium text-sm">{edu.degree_level || "—"}</p>
+                                                        )}
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-xs text-gray-400 mb-1">ปีที่สำเร็จการศึกษา</p>
+                                                        {editMode ? (
+                                                            <input value={edu.graduation_year} onChange={(e) => {
+                                                                const newEdu = [...form.educations];
+                                                                newEdu[idx].graduation_year = e.target.value;
+                                                                setForm(p => ({ ...p, educations: newEdu }));
+                                                            }} placeholder="พ.ศ." className={inputClass} />
+                                                        ) : (
+                                                            <p className="text-gray-800 font-medium text-sm">{edu.graduation_year || "—"}</p>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                    {editMode && (
+                                        <button onClick={() => setForm(p => ({ ...p, educations: [...p.educations, { faculty_id: null, department_id: null, degree_level: "", graduation_year: "" }] }))}
+                                            className="w-full py-2 border-2 border-dashed border-gray-300 rounded-xl text-gray-500 font-medium hover:border-[#414E51] hover:text-[#414E51] transition flex items-center justify-center gap-2">
+                                            + เพิ่มประวัติการศึกษา
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        )}
 
-                                    {/* หลักสูตร/สาขาวิชา */}
-                                    <div>
-                                        <p className="text-xs text-gray-400 mb-1">สาขาวิชา</p>
-                                        {editMode ? (
-                                            <select
-                                                value={form.department_id ?? ""}
-                                                onChange={(e) => {
-                                                    const id = e.target.value ? Number(e.target.value) : null;
-                                                    setForm(prev => ({ ...prev, department_id: id }));
-                                                }}
-                                                disabled={!form.faculty_id}
-                                                className={`${selectClass} ${!form.faculty_id ? "opacity-50 cursor-not-allowed" : ""}`}
-                                            >
-                                                <option value="">เลือกสาขาวิชา</option>
-                                                {filteredDepts.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-                                            </select>
-                                        ) : (
-                                            <p className="text-gray-800 font-medium text-sm">{user.department || "—"}</p>
-                                        )}
-                                    </div>
+                        {/* ข้อมูลการทำงาน */}
+                        {user.role !== "ADMIN" && (
+                            <div className="bg-white rounded-2xl shadow-md p-6 mt-6">
+                                <div className="flex items-center justify-between mb-4">
+                                    <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                                        <Briefcase size={18} className="text-[#414E51]" /> ประวัติการทำงาน
+                                    </h2>
+                                </div>
+                                <div className="space-y-4">
+                                    {form.careers.map((car, idx) => (
+                                        <div key={idx} className="relative bg-gray-50 p-4 rounded-xl border border-gray-200">
+                                            {editMode && (
+                                                <button onClick={() => setForm(p => ({ ...p, careers: p.careers.filter((_, i) => i !== idx) }))}
+                                                    className="absolute top-3 right-3 text-red-500 hover:text-red-700 bg-red-50 p-1.5 rounded-lg transition" title="ลบข้อมูลนี้">
+                                                    <X size={16} />
+                                                </button>
+                                            )}
+                                            <div className="grid sm:grid-cols-2 gap-4">
+                                                <div>
+                                                    <p className="text-xs text-gray-400 mb-1">ตำแหน่ง / อาชีพ</p>
+                                                    {editMode ? (
+                                                        <input value={car.occupation} onChange={(e) => {
+                                                            const newCar = [...form.careers];
+                                                            newCar[idx].occupation = e.target.value;
+                                                            setForm(p => ({ ...p, careers: newCar }));
+                                                        }} placeholder="เช่น วิศวกร" className={inputClass} />
+                                                    ) : (
+                                                        <p className="text-gray-800 font-medium text-sm">{car.occupation || "—"}</p>
+                                                    )}
+                                                </div>
+                                                <div>
+                                                    <p className="text-xs text-gray-400 mb-1">หน่วยงาน / บริษัท</p>
+                                                    {editMode ? (
+                                                        <input value={car.company} onChange={(e) => {
+                                                            const newCar = [...form.careers];
+                                                            newCar[idx].company = e.target.value;
+                                                            setForm(p => ({ ...p, careers: newCar }));
+                                                        }} placeholder="เช่น บริษัทเอบีซี" className={inputClass} />
+                                                    ) : (
+                                                        <p className="text-gray-800 font-medium text-sm">{car.company || "—"}</p>
+                                                    )}
+                                                </div>
+                                                <div>
+                                                    <p className="text-xs text-gray-400 mb-1">ปีที่เริ่มทำงาน</p>
+                                                    {editMode ? (
+                                                        <input value={car.start_year} onChange={(e) => {
+                                                            const newCar = [...form.careers];
+                                                            newCar[idx].start_year = e.target.value;
+                                                            setForm(p => ({ ...p, careers: newCar }));
+                                                        }} placeholder="พ.ศ." className={inputClass} />
+                                                    ) : (
+                                                        <p className="text-gray-800 font-medium text-sm">{car.start_year || "—"}</p>
+                                                    )}
+                                                </div>
+                                                <div>
+                                                    <p className="text-xs text-gray-400 mb-1">ปีที่สิ้นสุด</p>
+                                                    {editMode ? (
+                                                        <input value={car.end_year} onChange={(e) => {
+                                                            const newCar = [...form.careers];
+                                                            newCar[idx].end_year = e.target.value;
+                                                            setForm(p => ({ ...p, careers: newCar }));
+                                                        }} placeholder={car.is_current ? "ปัจจุบัน" : "พ.ศ."} disabled={car.is_current} className={`${inputClass} ${car.is_current ? "opacity-50" : ""}`} />
+                                                    ) : (
+                                                        <p className="text-gray-800 font-medium text-sm">{car.is_current ? "ปัจจุบัน" : (car.end_year || "—")}</p>
+                                                    )}
+                                                </div>
+                                                {editMode && (
+                                                    <div className="sm:col-span-2 flex items-center gap-2 mt-1">
+                                                        <input type="checkbox" id={`current-${idx}`} checked={car.is_current} onChange={(e) => {
+                                                            const newCar = [...form.careers];
+                                                            // ถ้าติ๊กถูก (เป็นงานปัจจุบัน) ให้ไปยกเลิกงานปัจจุบันอันอื่น
+                                                            if (e.target.checked) {
+                                                                newCar.forEach(c => c.is_current = false);
+                                                                newCar[idx].is_current = true;
+                                                                newCar[idx].end_year = "";
+                                                            } else {
+                                                                newCar[idx].is_current = false;
+                                                            }
+                                                            setForm(p => ({ ...p, careers: newCar }));
+                                                        }} className="w-4 h-4 text-[#414E51] rounded border-gray-300 focus:ring-[#414E51]" />
+                                                        <label htmlFor={`current-${idx}`} className="text-sm text-gray-600 cursor-pointer">งานปัจจุบัน (เลือกได้เพียง 1 รายการ)</label>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {editMode && (
+                                        <button onClick={() => setForm(p => ({ ...p, careers: [...p.careers, { occupation: "", company: "", is_current: true, start_year: "", end_year: "" }] }))}
+                                            className="w-full py-2 border-2 border-dashed border-gray-300 rounded-xl text-gray-500 font-medium hover:border-[#414E51] hover:text-[#414E51] transition flex items-center justify-center gap-2">
+                                            + เพิ่มประวัติการทำงาน
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         )}

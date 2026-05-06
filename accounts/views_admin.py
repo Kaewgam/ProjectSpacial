@@ -49,16 +49,16 @@ def admin_stats(request):
 
     # Faculty breakdown (top 5)
     faculty_stats = (
-        alumni.exclude(faculty_ref__isnull=True)
-        .values(faculty=F('faculty_ref__name'))
+        alumni.exclude(educations__faculty_ref__isnull=True)
+        .values(faculty=F('educations__faculty_ref__name'))
         .annotate(count=Count("id"))
         .order_by("-count")[:5]
     )
 
     # Department breakdown (top 5)
     department_stats = (
-        alumni.exclude(department_ref__isnull=True)
-        .values(department=F('department_ref__name'))
+        alumni.exclude(educations__department_ref__isnull=True)
+        .values(department=F('educations__department_ref__name'))
         .annotate(count=Count("id"))
         .order_by("-count")[:5]
     )
@@ -136,15 +136,17 @@ def admin_users_list(request):
     page = int(request.GET.get("page", 1))
     page_size = 15
 
-    queryset = User.objects.select_related('faculty_ref', 'department_ref').all().order_by("-date_joined")
+    queryset = User.objects.select_related('profile').prefetch_related(
+        'educations__faculty_ref', 'educations__department_ref', 'careers'
+    ).all().order_by("-date_joined")
 
     if q:
         queryset = queryset.filter(
             Q(student_id__icontains=q)
-            | Q(email__icontains=q)
-            | Q(first_name__icontains=q)
-            | Q(last_name__icontains=q)
-        )
+            | Q(profile__email__icontains=q)
+            | Q(profile__first_name__icontains=q)
+            | Q(profile__last_name__icontains=q)
+        ).distinct()
     if role:
         queryset = queryset.filter(role=role.upper())
     if active == "true":
@@ -155,27 +157,47 @@ def admin_users_list(request):
     paginator = Paginator(queryset, page_size)
     page_obj = paginator.get_page(page)
 
-    results = [
-        {
+    results = []
+    for u in page_obj:
+        profile = getattr(u, 'profile', None)
+        edu = u.educations.first()
+        career = u.careers.first()
+        
+        results.append({
             "id": str(u.id),
             "student_id": u.student_id,
-            "email": u.email,
+            "email": profile.email if profile else "",
             "role": u.role,
-            "prefix": u.prefix,
-            "first_name": u.first_name,
-            "last_name": u.last_name,
-            "faculty": u.faculty_ref.name if u.faculty_ref else "",
-            "department": u.department_ref.name if u.department_ref else "",
-            "faculty_id": u.faculty_ref.id if u.faculty_ref else None,
-            "department_id": u.department_ref.id if u.department_ref else None,
-            "occupation": u.occupation,
-            "company": u.company,
+            "prefix": profile.prefix if profile else "",
+            "first_name": profile.first_name if profile else "",
+            "last_name": profile.last_name if profile else "",
+            "faculty": edu.faculty_ref.name if edu and edu.faculty_ref else "",
+            "department": edu.department_ref.name if edu and edu.department_ref else "",
+            "faculty_id": edu.faculty_ref.id if edu and edu.faculty_ref else None,
+            "department_id": edu.department_ref.id if edu and edu.department_ref else None,
+            "occupation": career.occupation if career else "",
+            "company": career.company if career else "",
+            "educations": [
+                {
+                    "faculty_id": e.faculty_ref.id if e.faculty_ref else None,
+                    "department_id": e.department_ref.id if e.department_ref else None,
+                    "degree_level": e.degree_level,
+                    "graduation_year": e.graduation_year
+                } for e in u.educations.all()
+            ],
+            "careers": [
+                {
+                    "occupation": c.occupation,
+                    "company": c.company,
+                    "is_current": c.is_current,
+                    "start_year": c.start_year,
+                    "end_year": c.end_year
+                } for c in u.careers.all()
+            ],
             "is_active": u.is_active,
             "date_joined": timezone.localtime(u.date_joined).strftime("%d/%m/%Y %H:%M"),
-            "avatar": request.build_absolute_uri(u.avatar.url) if u.avatar else None,
-        }
-        for u in page_obj
-    ]
+            "avatar": request.build_absolute_uri(profile.avatar.url) if profile and profile.avatar else None,
+        })
 
     return Response({
         "results": results,
@@ -205,8 +227,7 @@ def admin_user_detail(request, user_id):
         return Response({"error": "ไม่สามารถลบบัญชีตัวเองได้"}, status=status.HTTP_400_BAD_REQUEST)
 
     if request.method == "PATCH":
-        allowed = ["role", "is_active", "prefix", "first_name", "last_name",
-                   "faculty", "department", "occupation", "company", "student_id", "email"]
+        from .models import UserProfile, UserEducation, UserCareer
         
         # Check Uniqueness for student_id
         new_student_id = request.data.get("student_id")
@@ -216,8 +237,10 @@ def admin_user_detail(request, user_id):
                 
         # Check Uniqueness for email
         new_email = request.data.get("email")
-        if new_email and new_email != target.email:
-            if User.objects.filter(email=new_email).exists():
+        if new_email:
+            profile = getattr(target, 'profile', None)
+            current_email = profile.email if profile else None
+            if new_email != current_email and UserProfile.objects.filter(email=new_email).exists():
                 return Response({"error": "ไม่สามารถเปลี่ยนได้: มี Email นี้ในระบบแล้ว"}, status=status.HTTP_400_BAD_REQUEST)
 
         # Check Required Fields if they are in request
@@ -225,34 +248,79 @@ def admin_user_detail(request, user_id):
             if field in request.data and not request.data[field]:
                 return Response({"error": f"กรุณากรอก/เลือก {field}"}, status=status.HTTP_400_BAD_REQUEST)
 
-        for field in ["role", "is_active", "prefix", "first_name", "last_name",
-                      "occupation", "company", "student_id", "email"]:
+        # Handle User fields
+        for field in ["role", "is_active", "student_id"]:
             if field in request.data:
                 setattr(target, field, request.data[field])
-
-        # Handle faculty FK
-        faculty_id = request.data.get('faculty_id')
-        if faculty_id:
-            try:
-                fac = Faculty.objects.get(id=faculty_id)
-                target.faculty_ref = fac
-                target.department_ref = None
-            except Faculty.DoesNotExist:
-                pass
-        elif 'faculty_id' in request.data and not faculty_id:
-            target.faculty_ref = None
-            target.department_ref = None
-
-        # Handle department FK
-        department_id = request.data.get('department_id')
-        if department_id:
-            try:
-                dept = Department.objects.get(id=department_id)
-                target.department_ref = dept
-            except Department.DoesNotExist:
-                pass
-
         target.save()
+
+        # Handle Profile fields
+        profile, _ = UserProfile.objects.get_or_create(user=target)
+        for field in ["prefix", "first_name", "last_name", "email"]:
+            if field in request.data:
+                setattr(profile, field, request.data[field])
+        profile.save()
+
+        # Handle multiple educations
+        if 'educations' in request.data and isinstance(request.data['educations'], list):
+            target.educations.all().delete()
+            for ed in request.data['educations']:
+                try:
+                    fac = Faculty.objects.get(id=ed['faculty_id']) if ed.get('faculty_id') else None
+                    dept = Department.objects.get(id=ed['department_id']) if ed.get('department_id') else None
+                    UserEducation.objects.create(
+                        user=target,
+                        faculty_ref=fac,
+                        department_ref=dept,
+                        degree_level=ed.get('degree_level', ''),
+                        graduation_year=ed.get('graduation_year', '')
+                    )
+                except Exception:
+                    pass
+        elif 'faculty_id' in request.data or 'department_id' in request.data:
+            edu = target.educations.first()
+            if not edu:
+                edu = UserEducation(user=target)
+            if 'faculty_id' in request.data:
+                try:
+                    edu.faculty_ref = Faculty.objects.get(id=request.data['faculty_id'])
+                    edu.department_ref = None # Reset dept when faculty changes
+                except Faculty.DoesNotExist:
+                    if not request.data['faculty_id']:
+                        edu.faculty_ref = None
+                        edu.department_ref = None
+            if 'department_id' in request.data:
+                try:
+                    edu.department_ref = Department.objects.get(id=request.data['department_id'])
+                except Department.DoesNotExist:
+                    if not request.data['department_id']:
+                        edu.department_ref = None
+            edu.save()
+
+        # Handle multiple careers
+        if 'careers' in request.data and isinstance(request.data['careers'], list):
+            target.careers.all().delete()
+            for car in request.data['careers']:
+                UserCareer.objects.create(
+                    user=target,
+                    occupation=car.get('occupation', ''),
+                    company=car.get('company', ''),
+                    is_current=car.get('is_current', True),
+                    start_year=car.get('start_year', ''),
+                    end_year=car.get('end_year', '')
+                )
+        elif 'occupation' in request.data or 'company' in request.data:
+            career = target.careers.first()
+            if not career:
+                career = UserCareer(user=target, is_current=True)
+            if 'occupation' in request.data:
+                career.occupation = request.data['occupation']
+            if 'company' in request.data:
+                career.company = request.data['company']
+            career.save()
+            
+        target.save() # Trigger neo4j sync
+
         neo4j_synced = getattr(target, "_neo4j_synced", True)
         return Response({
             "message": "อัปเดตสำเร็จ",
@@ -311,57 +379,101 @@ def admin_create_user(request):
             {"errors": {"student_id": f"Student ID '{student_id}' มีอยู่ในระบบแล้ว"}},
             status=status.HTTP_400_BAD_REQUEST
         )
-    if User.objects.filter(email=email).exists():
+    from .models import UserProfile, UserEducation, UserCareer
+    if UserProfile.objects.filter(email=email).exists():
         return Response(
             {"errors": {"email": f"Email '{email}' มีอยู่ในระบบแล้ว"}},
             status=status.HTTP_400_BAD_REQUEST
         )
 
     # Create user
-    faculty_ref = None
-    department_ref = None
-
-    faculty_id = request.data.get("faculty_id")
-    department_id = request.data.get("department_id")
-    if faculty_id:
-        try:
-            faculty_ref = Faculty.objects.get(id=faculty_id)
-        except Faculty.DoesNotExist:
-            pass
-    if department_id:
-        try:
-            department_ref = Department.objects.get(id=department_id)
-        except Department.DoesNotExist:
-            pass
-
     user = User(
         student_id=student_id,
-        email=email,
         role=role,
-        prefix=request.data.get("prefix", ""),
-        first_name=request.data.get("first_name", ""),
-        last_name=request.data.get("last_name", ""),
-        faculty_ref=faculty_ref,
-        department_ref=department_ref,
-        occupation=request.data.get("occupation", ""),
-        company=request.data.get("company", ""),
         is_active=True,
     )
     user.set_password(password)
+    user.save()
 
-    # Save ไป Django (Neo4j ล้มเหลวจะไม่พังแล้ว เพราะถูกครอบ try..except ไว้ใน models.py)
+    # Create profile
+    UserProfile.objects.create(
+        user=user,
+        email=email,
+        prefix=request.data.get("prefix", ""),
+        first_name=request.data.get("first_name", ""),
+        last_name=request.data.get("last_name", ""),
+    )
+
+    # Create education
+    educations_data = request.data.get("educations")
+    if educations_data and isinstance(educations_data, list):
+        for ed in educations_data:
+            try:
+                fac = Faculty.objects.get(id=ed['faculty_id']) if ed.get('faculty_id') else None
+                dept = Department.objects.get(id=ed['department_id']) if ed.get('department_id') else None
+                UserEducation.objects.create(
+                    user=user,
+                    faculty_ref=fac,
+                    department_ref=dept,
+                    degree_level=ed.get('degree_level', ''),
+                    graduation_year=ed.get('graduation_year', '')
+                )
+            except Exception:
+                pass
+    else:
+        faculty_id = request.data.get("faculty_id")
+        department_id = request.data.get("department_id")
+        if faculty_id or department_id:
+            edu = UserEducation(user=user)
+            if faculty_id:
+                try:
+                    edu.faculty_ref = Faculty.objects.get(id=faculty_id)
+                except Faculty.DoesNotExist:
+                    pass
+            if department_id:
+                try:
+                    edu.department_ref = Department.objects.get(id=department_id)
+                except Department.DoesNotExist:
+                    pass
+            edu.save()
+        
+    # Create career
+    careers_data = request.data.get("careers")
+    if careers_data and isinstance(careers_data, list):
+        for car in careers_data:
+            UserCareer.objects.create(
+                user=user,
+                occupation=car.get('occupation', ''),
+                company=car.get('company', ''),
+                is_current=car.get('is_current', True),
+                start_year=car.get('start_year', ''),
+                end_year=car.get('end_year', '')
+            )
+    else:
+        occupation = request.data.get("occupation", "")
+        company = request.data.get("company", "")
+        if occupation or company:
+            UserCareer.objects.create(
+                user=user,
+                occupation=occupation,
+                company=company,
+                is_current=True
+            )
+
+    # Save user again to trigger neo4j sync (since we just created relations)
     user.save()
     neo4j_synced = getattr(user, "_neo4j_synced", True)
 
+    profile = user.profile
     return Response({
         "message": "สร้างบัญชีสำเร็จ",
         "user": {
             "id": str(user.id),
             "student_id": user.student_id,
-            "email": user.email,
+            "email": profile.email,
             "role": user.role,
-            "first_name": user.first_name,
-            "last_name": user.last_name,
+            "first_name": profile.first_name,
+            "last_name": profile.last_name,
         },
         "neo4j_synced": neo4j_synced,
     }, status=status.HTTP_201_CREATED)

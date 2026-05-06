@@ -134,18 +134,14 @@ export default function GraphPage() {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
 
-        // กำหนดสีและขนาดตาม type ของ Node
         const nodes: GraphNode[] = (data.nodes || []).map((n: GraphNode) => ({
           ...n,
-          color: n.type === "faculty" ? "#10b981" : 
-                 n.type === "department" ? "#3b82f6" : 
-                 n.type === "company" ? "#f59e0b" : "#a78bfa",
           val: n.val || 6,
         }));
 
         const links = data.links || [];
         
-        // Resolve faculty/department/company for user nodes from relationships
+        // Resolve relationships
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         links.forEach((l: any) => {
           const s = typeof l.source === "object" ? l.source.id : l.source;
@@ -154,11 +150,46 @@ export default function GraphPage() {
           const sNode = nodes.find(n => n.id === s);
           const tNode = nodes.find(n => n.id === t);
           
-          if (sNode && sNode.type === "user" && tNode) {
-             if (l.type === "STUDIED_IN" && tNode.type === "faculty") sNode.faculty = tNode.id;
-             if (l.type === "BELONGS_TO" && tNode.type === "department") sNode.department = tNode.id;
-             if (l.type === "WORKS_AS" && tNode.type === "company") sNode.company = tNode.id;
+          if (sNode && tNode) {
+             if (sNode.type === "user") {
+               if (l.type === "STUDIED_IN" && tNode.type === "faculty") sNode.faculty = tNode.id;
+               if (l.type === "BELONGS_TO" && tNode.type === "department") sNode.department = tNode.id;
+               if (l.type === "WORKS_AS" && tNode.type === "company") sNode.company = tNode.id;
+             }
+             if (sNode.type === "department" && tNode.type === "faculty") {
+               sNode.faculty = tNode.id;
+             }
           }
+        });
+
+        // Assign colors based on Faculty cluster
+        const FACULTY_COLORS = [
+          "#ef4444", "#f97316", "#eab308", "#84cc16", "#22c55e", 
+          "#14b8a6", "#06b6d4", "#3b82f6", "#6366f1", "#a855f7", 
+          "#d946ef", "#ec4899"
+        ];
+        const facultyColorMap = new Map<string, string>();
+        let colorIndex = 0;
+
+        nodes.forEach(n => {
+           if (n.type === "faculty" && !facultyColorMap.has(n.id)) {
+              facultyColorMap.set(n.id, FACULTY_COLORS[colorIndex % FACULTY_COLORS.length]);
+              colorIndex++;
+           }
+        });
+
+        nodes.forEach(n => {
+           if (n.type === "faculty") {
+              n.color = facultyColorMap.get(n.id) || "#10b981";
+           } else if (n.type === "user") {
+              n.color = n.faculty && facultyColorMap.has(n.faculty) ? facultyColorMap.get(n.faculty) : "#a78bfa";
+           } else if (n.type === "department") {
+              n.color = n.faculty && facultyColorMap.has(n.faculty) ? facultyColorMap.get(n.faculty) : "#3b82f6";
+           } else if (n.type === "company") {
+              n.color = "#f59e0b";
+           } else {
+              n.color = "#94a3b8";
+           }
         });
 
         setRawGraphData({ nodes, links });
@@ -435,7 +466,7 @@ export default function GraphPage() {
               nodeColor={(node) => {
                 const n = node as GraphNode;
                 if (highlightNodes.size > 0) {
-                  return highlightNodes.has(n.id) ? "#c4b5fd" : "#374151";
+                  return highlightNodes.has(n.id) ? (n.color || "#a78bfa") : "#374151";
                 }
                 return getNodeColor(n);
               }}
@@ -453,13 +484,15 @@ export default function GraphPage() {
                 const x = n.x ?? 0;
                 const y = n.y ?? 0;
 
+                const nodeColor = n.color || "#a78bfa";
+
                 // Glow for selected
                 if (isSelected) {
                   ctx.beginPath();
                   ctx.arc(x, y, r + 5, 0, 2 * Math.PI);
                   const grd = ctx.createRadialGradient(x, y, r, x, y, r + 5);
-                  grd.addColorStop(0, "#a78bfa88");
-                  grd.addColorStop(1, "#a78bfa00");
+                  grd.addColorStop(0, `${nodeColor}88`);
+                  grd.addColorStop(1, `${nodeColor}00`);
                   ctx.fillStyle = grd;
                   ctx.fill();
                 }
@@ -469,10 +502,8 @@ export default function GraphPage() {
                 ctx.arc(x, y, r, 0, 2 * Math.PI);
                 ctx.fillStyle = isHighlighted
                   ? isSelected
-                    ? "#c4b5fd"
-                    : highlightNodes.has(n.id)
-                    ? "#a78bfa"
-                    : "#a78bfa"
+                    ? "#ffffff"
+                    : nodeColor
                   : "#374151";
                 ctx.fill();
 
@@ -638,9 +669,8 @@ export default function GraphPage() {
               <div className="mt-3 pt-3 border-t border-slate-700/50">
                 <p className="text-xs font-semibold text-slate-400 mb-2">สัญลักษณ์สี</p>
                 <div className="flex flex-col gap-1.5">
-                  <LegendItem color="#a78bfa" label="ศิษย์เก่า (User)" />
-                  <LegendItem color="#34d399" label="คณะ (Faculty)" />
-                  <LegendItem color="#60a5fa" label="สาขาวิชา (Department)" />
+                  <LegendItem color="linear-gradient(135deg, #ef4444, #3b82f6, #10b981)" label="บุคคล / สาขา (กลุ่มสีตามคณะ)" />
+                  <LegendItem color="#a78bfa" label="บุคคล (ไม่ระบุคณะ)" />
                   <LegendItem color="#f59e0b" label="หน่วยงาน (Company)" />
                 </div>
               </div>

@@ -16,6 +16,23 @@ export interface AuthUser {
     department: string;
     occupation: string;
     company: string;
+    educations?: {
+        id?: number;
+        faculty_id: string | null;
+        faculty_name: string;
+        department_id: string | null;
+        department_name: string;
+        degree_level: string;
+        graduation_year: string;
+    }[];
+    careers?: {
+        id?: number;
+        occupation: string;
+        company: string;
+        is_current: boolean;
+        start_year: string;
+        end_year: string;
+    }[];
     date_joined: string;
     avatar: string | null;
 }

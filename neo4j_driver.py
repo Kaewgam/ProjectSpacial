@@ -18,7 +18,14 @@ driver = GraphDatabase.driver(
 
 def sync_user_to_neo4j(user):
     with driver.session() as session:
-        avatar_url = user.avatar.url if user.avatar else ""
+        profile = getattr(user, 'profile', None)
+        first_name = profile.first_name if profile else ""
+        last_name = profile.last_name if profile else ""
+        avatar_url = profile.avatar.url if profile and profile.avatar else ""
+        
+        current_career = user.careers.filter(is_current=True).first() if hasattr(user, 'careers') else None
+        occupation = current_career.occupation if current_career else ""
+
         session.run("""
             MERGE (u:User {student_id: $student_id})
             SET 
@@ -29,36 +36,46 @@ def sync_user_to_neo4j(user):
                 u.occupation = $occupation
         """,
         student_id=user.student_id,
-        first_name=user.first_name,
-        last_name=user.last_name,
-        email=user.email,
-        role=user.role,
+        first_name=first_name,
+        last_name=last_name,
         avatar=avatar_url,
-        occupation=user.occupation
+        occupation=occupation
         )
 
-        # 🔗 Faculty + Department
-        if user.faculty_ref:
-            session.run("""
-                MATCH (u:User {student_id: $student_id})
-                MERGE (f:Faculty {name: $faculty})
-                MERGE (u)-[:STUDIED_IN]->(f)
-            """, student_id=user.student_id, faculty=user.faculty_ref.name)
+        # Clear old relationships
+        session.run("""
+            MATCH (u:User {student_id: $student_id})-[r:STUDIED_IN|BELONGS_TO|WORKS_AS]->()
+            DELETE r
+        """, student_id=user.student_id)
 
-        if user.department_ref:
-            session.run("""
-                MATCH (u:User {student_id: $student_id})
-                MERGE (d:Department {name: $department})
-                MERGE (u)-[:BELONGS_TO]->(d)
-            """, student_id=user.student_id, department=user.department_ref.name)
+        # 🔗 Faculty + Department
+        if hasattr(user, 'educations'):
+            for edu in user.educations.all():
+                if edu.faculty_ref:
+                    session.run("""
+                        MATCH (u:User {student_id: $student_id})
+                        MERGE (f:Faculty {id: $faculty_id})
+                        SET f.name = $faculty
+                        MERGE (u)-[:STUDIED_IN]->(f)
+                    """, student_id=user.student_id, faculty_id=edu.faculty_ref.id, faculty=edu.faculty_ref.name)
+
+                if edu.department_ref:
+                    session.run("""
+                        MATCH (u:User {student_id: $student_id})
+                        MERGE (d:Department {id: $department_id})
+                        SET d.name = $department
+                        MERGE (u)-[:BELONGS_TO]->(d)
+                    """, student_id=user.student_id, department_id=edu.department_ref.id, department=edu.department_ref.name)
 
         # 💼 Company
-        if user.company:
-            session.run("""
-                MATCH (u:User {student_id: $student_id})
-                MERGE (c:Company {name: $company})
-                MERGE (u)-[:WORKS_AS]->(c)
-            """, student_id=user.student_id, company=user.company)
+        if hasattr(user, 'careers'):
+            for car in user.careers.all():
+                if car.company:
+                    session.run("""
+                        MATCH (u:User {student_id: $student_id})
+                        MERGE (c:Company {name: $company})
+                        MERGE (u)-[:WORKS_AS]->(c)
+                    """, student_id=user.student_id, company=car.company)
 
     # 🤝 สร้าง KNOWS อัตโนมัติจาก Faculty / Department / Company เดียวกัน
     auto_create_knows()

@@ -18,6 +18,8 @@ interface AlumniResult {
     department?: string;
     occupation?: string;
     company?: string;
+    educations?: { faculty?: string; department?: string; degree_level?: string; graduation_year?: string }[];
+    careers?: { occupation?: string; company?: string; is_current?: boolean; start_year?: string; end_year?: string }[];
 }
 
 const ROLE_LABELS: Record<string, { label: string; color: string }> = {
@@ -60,31 +62,71 @@ function AlumniCard({ alum }: { alum: AlumniResult }) {
 
                     {/* Tags */}
                     <div className="flex flex-wrap gap-2">
-                        {alum.faculty && (
-                            <div className="flex items-center gap-1.5 bg-violet-50 border border-violet-100 rounded-full px-3 py-1">
-                                <Building2 size={11} className="text-violet-500 flex-shrink-0" />
-                                <span className="text-xs text-violet-700 truncate max-w-[140px]">{alum.faculty}</span>
+                        {alum.educations && alum.educations.length > 0 ? alum.educations.map((edu, idx) => (
+                            <div key={`edu-${idx}`} className="flex flex-wrap gap-2">
+                                {edu.faculty && (
+                                    <div className="flex items-center gap-1.5 bg-violet-50 border border-violet-100 rounded-full px-3 py-1" title={edu.faculty}>
+                                        <Building2 size={11} className="text-violet-500 flex-shrink-0" />
+                                        <span className="text-xs text-violet-700 truncate max-w-[140px]">{edu.faculty}</span>
+                                    </div>
+                                )}
+                                {edu.department && (
+                                    <div className="flex items-center gap-1.5 bg-sky-50 border border-sky-100 rounded-full px-3 py-1" title={edu.department}>
+                                        <MapPin size={11} className="text-sky-500 flex-shrink-0" />
+                                        <span className="text-xs text-sky-700 truncate max-w-[140px]">{edu.department}</span>
+                                    </div>
+                                )}
                             </div>
+                        )) : (
+                            <>
+                                {alum.faculty && (
+                                    <div className="flex items-center gap-1.5 bg-violet-50 border border-violet-100 rounded-full px-3 py-1">
+                                        <Building2 size={11} className="text-violet-500 flex-shrink-0" />
+                                        <span className="text-xs text-violet-700 truncate max-w-[140px]">{alum.faculty}</span>
+                                    </div>
+                                )}
+                                {alum.department && (
+                                    <div className="flex items-center gap-1.5 bg-sky-50 border border-sky-100 rounded-full px-3 py-1">
+                                        <MapPin size={11} className="text-sky-500 flex-shrink-0" />
+                                        <span className="text-xs text-sky-700 truncate max-w-[140px]">{alum.department}</span>
+                                    </div>
+                                )}
+                            </>
                         )}
-                        {alum.department && (
-                            <div className="flex items-center gap-1.5 bg-sky-50 border border-sky-100 rounded-full px-3 py-1">
-                                <MapPin size={11} className="text-sky-500 flex-shrink-0" />
-                                <span className="text-xs text-sky-700 truncate max-w-[140px]">{alum.department}</span>
+
+                        {alum.careers && alum.careers.length > 0 ? alum.careers.map((car, idx) => (
+                            <div key={`car-${idx}`} className="flex flex-wrap gap-2">
+                                {car.occupation && (
+                                    <div className="flex items-center gap-1.5 bg-amber-50 border border-amber-100 rounded-full px-3 py-1" title={car.occupation}>
+                                        <Briefcase size={11} className="text-amber-600 flex-shrink-0" />
+                                        <span className="text-xs text-amber-700 truncate max-w-[140px]">{car.occupation}</span>
+                                    </div>
+                                )}
+                                {car.company && (
+                                    <div className="flex items-center gap-1.5 bg-pink-50 border border-pink-100 rounded-full px-3 py-1" title={car.company}>
+                                        <Building2 size={11} className="text-pink-600 flex-shrink-0" />
+                                        <span className="text-xs text-pink-700 truncate max-w-[140px]">{car.company}</span>
+                                    </div>
+                                )}
                             </div>
+                        )) : (
+                            <>
+                                {alum.occupation && (
+                                    <div className="flex items-center gap-1.5 bg-amber-50 border border-amber-100 rounded-full px-3 py-1">
+                                        <Briefcase size={11} className="text-amber-600 flex-shrink-0" />
+                                        <span className="text-xs text-amber-700 truncate max-w-[140px]">{alum.occupation}</span>
+                                    </div>
+                                )}
+                                {alum.company && (
+                                    <div className="flex items-center gap-1.5 bg-pink-50 border border-pink-100 rounded-full px-3 py-1">
+                                        <Building2 size={11} className="text-pink-600 flex-shrink-0" />
+                                        <span className="text-xs text-pink-700 truncate max-w-[140px]">{alum.company}</span>
+                                    </div>
+                                )}
+                            </>
                         )}
-                        {alum.occupation && (
-                            <div className="flex items-center gap-1.5 bg-amber-50 border border-amber-100 rounded-full px-3 py-1">
-                                <Briefcase size={11} className="text-amber-600 flex-shrink-0" />
-                                <span className="text-xs text-amber-700 truncate max-w-[140px]">{alum.occupation}</span>
-                            </div>
-                        )}
-                        {alum.company && (
-                            <div className="flex items-center gap-1.5 bg-pink-50 border border-pink-100 rounded-full px-3 py-1">
-                                <Building2 size={11} className="text-pink-600 flex-shrink-0" />
-                                <span className="text-xs text-pink-700 truncate max-w-[140px]">{alum.company}</span>
-                            </div>
-                        )}
-                        {!alum.faculty && !alum.department && !alum.occupation && !alum.company && (
+                        
+                        {!(alum.educations?.length) && !(alum.careers?.length) && !alum.faculty && !alum.department && !alum.occupation && !alum.company && (
                             <span className="text-xs text-gray-400 italic">ยังไม่มีข้อมูลเพิ่มเติม</span>
                         )}
                     </div>

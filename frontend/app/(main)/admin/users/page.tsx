@@ -18,11 +18,24 @@ interface AdminUser {
   last_name: string;
   faculty: string;
   department: string;
+  faculty_id?: number | string;
+  department_id?: number | string;
   occupation: string;
   company: string;
   is_active: boolean;
   date_joined: string;
   avatar: string | null;
+}
+
+interface FacultyOption {
+  id: number;
+  name: string;
+}
+
+interface DepartmentOption {
+  id: number;
+  name: string;
+  faculty_id: number;
 }
 
 interface UsersResponse {
@@ -42,6 +55,8 @@ interface CreateForm {
   last_name: string;
   faculty: string;
   department: string;
+  faculty_id?: string | number;
+  department_id?: string | number;
   occupation: string;
   company: string;
 }
@@ -49,7 +64,7 @@ interface CreateForm {
 const EMPTY_FORM: CreateForm = {
   student_id: "", email: "", password: "", role: "ALUMNI",
   prefix: "", first_name: "", last_name: "",
-  faculty: "", department: "", occupation: "", company: "",
+  faculty: "", department: "", faculty_id: "", department_id: "", occupation: "", company: "",
 };
 
 const ROLE_COLORS: Record<string, string> = {
@@ -96,6 +111,21 @@ function CreateUserModal({
   const [showPass, setShowPass] = useState(false);
   const [neo4jWarn, setNeo4jWarn] = useState(false);
   const [generalError, setGeneralError] = useState("");
+
+  const [faculties, setFaculties] = useState<FacultyOption[]>([]);
+  const [departments, setDepartments] = useState<DepartmentOption[]>([]);
+
+  useEffect(() => {
+    api.get("/api/faculties/").then((res) => setFaculties(res.data)).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (form.faculty_id) {
+      api.get(`/api/departments/?faculty_id=${form.faculty_id}`).then((res) => setDepartments(res.data)).catch(() => {});
+    } else {
+      setDepartments([]);
+    }
+  }, [form.faculty_id]);
 
   const set = (k: keyof CreateForm, v: string) => {
     setForm((f) => ({ ...f, [k]: v }));
@@ -264,20 +294,32 @@ function CreateUserModal({
             </p>
             <div className="grid grid-cols-2 gap-4">
               <Field label="คณะ">
-                <input
+                <select
                   className={inputCls()}
-                  value={form.faculty}
-                  onChange={(e) => set("faculty", e.target.value)}
-                  placeholder="เช่น วิศวกรรมศาสตร์"
-                />
+                  value={form.faculty_id || ""}
+                  onChange={(e) => {
+                    set("faculty_id", e.target.value);
+                    set("department_id", "");
+                  }}
+                >
+                  <option value="">— ไม่ระบุ —</option>
+                  {faculties.map((f) => (
+                    <option key={f.id} value={f.id}>{f.name}</option>
+                  ))}
+                </select>
               </Field>
               <Field label="หลักสูตร/สาขาวิชา">
-                <input
+                <select
                   className={inputCls()}
-                  value={form.department}
-                  onChange={(e) => set("department", e.target.value)}
-                  placeholder="เช่น วิศวกรรมคอมพิวเตอร์"
-                />
+                  value={form.department_id || ""}
+                  onChange={(e) => set("department_id", e.target.value)}
+                  disabled={!form.faculty_id}
+                >
+                  <option value="">— ไม่ระบุ —</option>
+                  {departments.map((d) => (
+                    <option key={d.id} value={d.id}>{d.name}</option>
+                  ))}
+                </select>
               </Field>
               <Field label="ตำแหน่ง" >
                 <input
@@ -359,12 +401,29 @@ function EditUserModal({
     last_name: user.last_name || "",
     faculty: user.faculty || "",
     department: user.department || "",
+    faculty_id: user.faculty_id || "",
+    department_id: user.department_id || "",
     occupation: user.occupation || "",
     company: user.company || "",
   });
   const [errors, setErrors] = useState<Partial<CreateForm>>({});
   const [loading, setLoading] = useState(false);
   const [generalError, setGeneralError] = useState("");
+
+  const [faculties, setFaculties] = useState<FacultyOption[]>([]);
+  const [departments, setDepartments] = useState<DepartmentOption[]>([]);
+
+  useEffect(() => {
+    api.get("/api/faculties/").then((res) => setFaculties(res.data)).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (form.faculty_id) {
+      api.get(`/api/departments/?faculty_id=${form.faculty_id}`).then((res) => setDepartments(res.data)).catch(() => {});
+    } else {
+      setDepartments([]);
+    }
+  }, [form.faculty_id]);
 
   const set = (k: keyof CreateForm, v: string) => {
     setForm((f) => ({ ...f, [k]: v }));
@@ -381,8 +440,8 @@ function EditUserModal({
       (form.prefix || "") === (user.prefix || "") &&
       (form.first_name || "") === (user.first_name || "") &&
       (form.last_name || "") === (user.last_name || "") &&
-      (form.faculty || "") === (user.faculty || "") &&
-      (form.department || "") === (user.department || "") &&
+      (form.faculty_id || "") == (user.faculty_id || "") &&
+      (form.department_id || "") == (user.department_id || "") &&
       (form.occupation || "") === (user.occupation || "") &&
       (form.company || "") === (user.company || "")
     );
@@ -539,18 +598,32 @@ function EditUserModal({
             </p>
             <div className="grid grid-cols-2 gap-4">
               <Field label="คณะ">
-                <input
+                <select
                   className={inputCls()}
-                  value={form.faculty}
-                  onChange={(e) => set("faculty", e.target.value)}
-                />
+                  value={form.faculty_id || ""}
+                  onChange={(e) => {
+                    set("faculty_id", e.target.value);
+                    set("department_id", "");
+                  }}
+                >
+                  <option value="">— ไม่ระบุ —</option>
+                  {faculties.map((f) => (
+                    <option key={f.id} value={f.id}>{f.name}</option>
+                  ))}
+                </select>
               </Field>
               <Field label="หลักสูตร/สาขาวิชา">
-                <input
+                <select
                   className={inputCls()}
-                  value={form.department}
-                  onChange={(e) => set("department", e.target.value)}
-                />
+                  value={form.department_id || ""}
+                  onChange={(e) => set("department_id", e.target.value)}
+                  disabled={!form.faculty_id}
+                >
+                  <option value="">— ไม่ระบุ —</option>
+                  {departments.map((d) => (
+                    <option key={d.id} value={d.id}>{d.name}</option>
+                  ))}
+                </select>
               </Field>
               <Field label="ตำแหน่ง" >
                 <input

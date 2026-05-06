@@ -28,54 +28,33 @@ class UserManager(BaseUserManager):
 
 
 class Faculty(models.Model):
+    id = models.CharField(primary_key=True, max_length=10)
     name = models.CharField(max_length=150, unique=True)
     
     def __str__(self):
-        return self.name
+        return f"[{self.id}] {self.name}"
 
 class Department(models.Model):
+    id = models.CharField(primary_key=True, max_length=10)
     faculty = models.ForeignKey(Faculty, on_delete=models.CASCADE, related_name='departments')
     name = models.CharField(max_length=150)
     short_name = models.CharField(max_length=20, blank=True, default='')
-    code = models.CharField(max_length=20, blank=True, default='')
     
     class Meta:
         unique_together = ('faculty', 'name')
 
     def __str__(self):
-        return self.name
+        return f"[{self.id}] {self.name}"
 
 class User(AbstractBaseUser, PermissionsMixin):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
 
-    # ข้อมูลบัญชี
     student_id = models.CharField(max_length=10, unique=True)
-    email = models.EmailField(unique=True)
     password = models.CharField(max_length=128)
     role = models.CharField(max_length=20, choices=[
         ('ADMIN', 'Admin'),
         ('ALUMNI', 'Alumni'),
     ], default='ALUMNI')
-
-    # ข้อมูลส่วนตัว
-    prefix = models.CharField(max_length=20, blank=True, default='', choices=[
-        ('นาย', 'นาย'),
-        ('นาง', 'นาง'),
-        ('นางสาว', 'นางสาว'),
-    ])
-    first_name = models.CharField(max_length=100, blank=True, default='')
-    last_name = models.CharField(max_length=100, blank=True, default='')
-
-    # ข้อมูลการศึกษา (FK)
-    faculty_ref = models.ForeignKey(Faculty, on_delete=models.SET_NULL, null=True, blank=True, related_name='users')
-    department_ref = models.ForeignKey(Department, on_delete=models.SET_NULL, null=True, blank=True, related_name='users')
-
-    # ข้อมูลอาชีพ
-    occupation = models.CharField(max_length=150, blank=True, default='') # ตำแหน่ง
-    company = models.CharField(max_length=150, blank=True, default='') # หน่วยงาน/สังกัด
-
-    # รูปโปรไฟล์
-    avatar = models.ImageField(upload_to='avatars/', blank=True, null=True)
 
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
@@ -84,7 +63,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     objects = UserManager()
 
     USERNAME_FIELD = 'student_id'
-    REQUIRED_FIELDS = ['email']
+    REQUIRED_FIELDS = []
 
     def __str__(self):
         return self.student_id
@@ -100,6 +79,42 @@ class User(AbstractBaseUser, PermissionsMixin):
             # ไม่ให้ระบบพังถ้า Neo4j ไม่ทำงาน
             print(f"Failed to sync user {self.student_id} to Neo4j: {e}")
             self._neo4j_synced = False
+
+class UserProfile(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
+    email = models.EmailField(unique=True, null=True, blank=True)
+    prefix = models.CharField(max_length=20, blank=True, default='', choices=[
+        ('นาย', 'นาย'),
+        ('นาง', 'นาง'),
+        ('นางสาว', 'นางสาว'),
+    ])
+    first_name = models.CharField(max_length=100, blank=True, default='')
+    last_name = models.CharField(max_length=100, blank=True, default='')
+    avatar = models.ImageField(upload_to='avatars/', blank=True, null=True)
+
+    def __str__(self):
+        return f"{self.first_name} {self.last_name}"
+
+class UserEducation(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='educations')
+    faculty_ref = models.ForeignKey(Faculty, on_delete=models.SET_NULL, null=True, blank=True, related_name='user_educations')
+    department_ref = models.ForeignKey(Department, on_delete=models.SET_NULL, null=True, blank=True, related_name='user_educations')
+    degree_level = models.CharField(max_length=50, blank=True, default='') # ป.ตรี, ป.โท, ป.เอก
+    graduation_year = models.CharField(max_length=4, blank=True, default='')
+
+    def __str__(self):
+        return f"{self.user.student_id} - {self.faculty_ref}"
+
+class UserCareer(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='careers')
+    occupation = models.CharField(max_length=150, blank=True, default='')
+    company = models.CharField(max_length=150, blank=True, default='')
+    is_current = models.BooleanField(default=True)
+    start_year = models.CharField(max_length=4, blank=True, default='')
+    end_year = models.CharField(max_length=4, blank=True, default='')
+
+    def __str__(self):
+        return f"{self.user.student_id} - {self.occupation} at {self.company}"
 
 class PasswordResetToken(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='reset_tokens')

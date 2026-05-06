@@ -81,7 +81,7 @@ export default function EditPostPage() {
       .then(res => {
         const p = res.data;
         setTitle(p.title || "");
-        setCategory((p.category as Category) || "");
+        setCategory(p.category || "");
         setExcerpt(p.excerpt || "");
         setContent(p.content || "");
         setAuthor(p.author || "");
