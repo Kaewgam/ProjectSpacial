@@ -547,6 +547,50 @@ export default function GraphPage() {
               linkDirectionalParticleSpeed={0.004}
               linkDirectionalParticleWidth={2}
               linkDirectionalParticleColor={() => "#a78bfa"}
+              linkCanvasObjectMode={() => "after"}
+              linkCanvasObject={(link, ctx) => {
+                // Ignore if not highlighted
+                if (highlightLinks.size > 0 && !highlightLinks.has(link as GraphLink)) return;
+                // If no highlighted nodes, maybe skip text to avoid clutter? Or show all?
+                // Let's only show text if the link is highlighted (user hovered/clicked a node)
+                if (highlightLinks.size === 0) return;
+
+                const start = (link as GraphLink).source as GraphNode;
+                const end = (link as GraphLink).target as GraphNode;
+                if (typeof start !== 'object' || typeof end !== 'object') return;
+
+                let label = (link as GraphLink).type;
+                if (label === "KNOWS") label = "รู้จักกัน";
+                else if (label === "STUDIED_IN") label = "เรียนคณะ";
+                else if (label === "WORKS_AS") label = "ทำงานที่";
+                else if (label === "BELONGS_TO") label = "สาขาวิชา";
+
+                const x = start.x! + (end.x! - start.x!) / 2;
+                const y = start.y! + (end.y! - start.y!) / 2;
+
+                ctx.font = `3px Inter, sans-serif`;
+                ctx.fillStyle = "#cbd5e1"; // slate-300
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                
+                const angle = Math.atan2(end.y! - start.y!, end.x! - start.x!);
+                ctx.save();
+                ctx.translate(x, y);
+                if (angle > Math.PI/2 || angle < -Math.PI/2) {
+                   ctx.rotate(angle + Math.PI);
+                } else {
+                   ctx.rotate(angle);
+                }
+                
+                // Draw text background for readability
+                const textWidth = ctx.measureText(label).width;
+                ctx.fillStyle = "rgba(15, 23, 42, 0.7)"; // bg-slate-900
+                ctx.fillRect(-textWidth/2 - 1, -3, textWidth + 2, 6);
+                
+                ctx.fillStyle = "#cbd5e1";
+                ctx.fillText(label, 0, 0);
+                ctx.restore();
+              }}
               // Hover and Click interactions bypass the library through container events
               // Physics
               d3AlphaDecay={0.02}
@@ -683,18 +727,35 @@ export default function GraphPage() {
               <div className="bg-slate-800/60 backdrop-blur border border-violet-500/30 rounded-xl p-4 flex-1 overflow-y-auto">
                 <p className="text-xs font-semibold text-violet-400 mb-3 uppercase tracking-wider">รายละเอียด</p>
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="w-12 h-12 rounded-full border-2 border-violet-500/40 flex items-center justify-center overflow-hidden flex-shrink-0 bg-violet-500/20">
-                    {selectedNode.avatar ? (
-                      <img src={selectedNode.avatar} alt={selectedNode.name || "avatar"} className="w-full h-full object-cover" />
+                  <div className={`w-12 h-12 rounded-full border-2 flex items-center justify-center overflow-hidden flex-shrink-0 ${
+                    selectedNode.type === "company" ? "border-amber-500/40 bg-amber-500/20" :
+                    selectedNode.type === "faculty" ? "border-green-500/40 bg-green-500/20" :
+                    selectedNode.type === "department" ? "border-blue-500/40 bg-blue-500/20" :
+                    "border-violet-500/40 bg-violet-500/20"
+                  }`}>
+                    {selectedNode.type === "user" ? (
+                      selectedNode.avatar ? (
+                        <img src={selectedNode.avatar} alt={selectedNode.name || "avatar"} className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-violet-300 font-bold text-lg">
+                          {selectedNode.name ? selectedNode.name.charAt(0).toUpperCase() : selectedNode.id.charAt(0).toUpperCase()}
+                        </span>
+                      )
+                    ) : selectedNode.type === "company" ? (
+                      <span className="text-2xl">🏢</span>
+                    ) : selectedNode.type === "faculty" ? (
+                      <span className="text-2xl">🏛️</span>
+                    ) : selectedNode.type === "department" ? (
+                      <span className="text-2xl">📚</span>
                     ) : (
-                      <span className="text-violet-300 font-bold text-lg">
-                        {selectedNode.name ? selectedNode.name.charAt(0).toUpperCase() : selectedNode.id.charAt(0).toUpperCase()}
-                      </span>
+                      <span className="text-2xl">📍</span>
                     )}
                   </div>
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-white leading-tight truncate">{selectedNode.name || "—"}</p>
-                    <p className="text-xs text-slate-400 mt-0.5">🪪 {selectedNode.id}</p>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      {selectedNode.type === "user" ? `🪪 รหัสนักศึกษา: ${selectedNode.id}` : `📍 ID: ${selectedNode.id}`}
+                    </p>
                   </div>
                 </div>
                 <div className="space-y-2 mb-4">
