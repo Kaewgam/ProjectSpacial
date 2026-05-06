@@ -79,7 +79,20 @@ def sync_user_to_neo4j(user):
 
     # 🤝 สร้าง KNOWS อัตโนมัติจาก Faculty / Department / Company เดียวกัน
     auto_create_knows()
+    
+    # 🧹 ลบโหนดขยะที่ไม่มีใครเชื่อมต่อ (เช่น บริษัทเก่าที่เคยพิมพ์ผิด)
+    clean_orphan_nodes()
 
+def clean_orphan_nodes():
+    """
+    ลบ Company nodes ที่ไม่มี User คนไหนเชื่อมต่อแล้ว (Orphan nodes)
+    """
+    with driver.session() as session:
+        session.run("""
+            MATCH (c:Company)
+            WHERE NOT (c)--()
+            DELETE c
+        """)
 
 def auto_create_knows():
     """

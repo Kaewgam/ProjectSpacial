@@ -14,9 +14,10 @@ driver = GraphDatabase.driver(URI, auth=(USER, PASSWORD))
 
 def get_graph_data(request):
     with driver.session() as session:
-        # ดึง Node ทั้งหมด (ทั้งที่มีและไม่มี relationship)
+        # ดึง Node ทั้งหมด (ไม่เอา Node ขยะที่ไม่มีเส้นเชื่อม ยกเว้น User)
         all_nodes_result = session.run("""
             MATCH (n)
+            WHERE (n:User) OR (n)--()
             RETURN n, labels(n) AS n_labels
         """)
 

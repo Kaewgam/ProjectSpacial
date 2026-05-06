@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Search, ChevronLeft, ChevronRight, User, Briefcase, Building2, MapPin, SlidersHorizontal } from "lucide-react";
 import api from "@/lib/api";
+import { useFacultyDept } from "@/lib/useFacultyDept";
 
 // ─── Types ───────────────────────────────────────────
 interface AlumniResult {
@@ -158,6 +159,11 @@ export default function SearchPage() {
     const [loading, setLoading] = useState(false);
     const [searched, setSearched] = useState(false);
 
+    const { faculties, departments: allDepartments } = useFacultyDept();
+    const filteredDepts = faculty 
+        ? allDepartments.filter(d => String(d.faculty_id) === String(faculties.find(f => f.name === faculty)?.id))
+        : allDepartments;
+
     const fetchResults = useCallback(
         async (q: string, fac: string, dep: string, occ: string, comp: string, p: number) => {
             setLoading(true);
@@ -223,12 +229,19 @@ export default function SearchPage() {
                                 <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-600 mb-1.5">
                                     <Building2 size={13} className="text-violet-500" /> คณะ / Faculty
                                 </label>
-                                <input
+                                <select
                                     value={faculty}
-                                    onChange={(e) => setFaculty(e.target.value)}
-                                    placeholder="เช่น วิทยาศาสตร์และเทคโนโลยี"
+                                    onChange={(e) => {
+                                        setFaculty(e.target.value);
+                                        setDepartment("");
+                                    }}
                                     className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-violet-300 focus:border-violet-400 focus:outline-none transition text-black"
-                                />
+                                >
+                                    <option value="">ทุกคณะ / All Faculties</option>
+                                    {faculties.map((f) => (
+                                        <option key={f.id} value={f.name}>{f.name}</option>
+                                    ))}
+                                </select>
                             </div>
 
                             {/* Department */}
@@ -236,12 +249,17 @@ export default function SearchPage() {
                                 <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-600 mb-1.5">
                                     <MapPin size={13} className="text-sky-500" /> หลักสูตร/สาขาวิชา
                                 </label>
-                                <input
+                                <select
                                     value={department}
                                     onChange={(e) => setDepartment(e.target.value)}
-                                    placeholder="เช่น วิทยาการคอมพิวเตอร์"
-                                    className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-sky-300 focus:border-sky-400 focus:outline-none transition text-black"
-                                />
+                                    disabled={!faculty}
+                                    className={`w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-sky-300 focus:border-sky-400 focus:outline-none transition text-black ${!faculty ? "opacity-50 cursor-not-allowed" : ""}`}
+                                >
+                                    <option value="">ทุกสาขาวิชา / All Departments</option>
+                                    {filteredDepts.map((d) => (
+                                        <option key={d.id} value={d.name}>{d.name}</option>
+                                    ))}
+                                </select>
                             </div>
 
                             {/* Occupation */}
