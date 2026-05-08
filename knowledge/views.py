@@ -9,12 +9,13 @@ from django.core.paginator import Paginator
 from .models import KnowledgePost, KnowledgeComment
 
 def get_author_info(user):
+    profile = getattr(user, 'profile', None)
     return {
         'id': user.student_id,
-        'first_name': user.first_name,
-        'last_name': user.last_name,
+        'first_name': getattr(profile, 'first_name', '') if profile else '',
+        'last_name': getattr(profile, 'last_name', '') if profile else '',
         'role': user.role,
-        'profile_image': user.profile_image.url if getattr(user, 'profile_image', None) else None
+        'profile_image': profile.avatar.url if profile and getattr(profile, 'avatar', None) and profile.avatar else None
     }
 
 def comment_to_dict(comment, request):

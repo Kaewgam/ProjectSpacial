@@ -227,7 +227,7 @@ export default function SearchPage() {
                             {/* Faculty */}
                             <div>
                                 <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-600 mb-1.5">
-                                    <Building2 size={13} className="text-violet-500" /> คณะ / Faculty
+                                    <Building2 size={13} className="text-violet-500" /> คณะ
                                 </label>
                                 <select
                                     value={faculty}
@@ -237,7 +237,7 @@ export default function SearchPage() {
                                     }}
                                     className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-violet-300 focus:border-violet-400 focus:outline-none transition text-black"
                                 >
-                                    <option value="">ทุกคณะ / All Faculties</option>
+                                    <option value="">ทุกคณะ</option>
                                     {faculties.map((f) => (
                                         <option key={f.id} value={f.name}>{f.name}</option>
                                     ))}
@@ -255,7 +255,7 @@ export default function SearchPage() {
                                     disabled={!faculty}
                                     className={`w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-sky-300 focus:border-sky-400 focus:outline-none transition text-black ${!faculty ? "opacity-50 cursor-not-allowed" : ""}`}
                                 >
-                                    <option value="">ทุกสาขาวิชา / All Departments</option>
+                                    <option value="">ทุกสาขาวิชา</option>
                                     {filteredDepts.map((d) => (
                                         <option key={d.id} value={d.name}>{d.name}</option>
                                     ))}

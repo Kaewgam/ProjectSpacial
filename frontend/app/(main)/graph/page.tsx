@@ -140,56 +140,56 @@ export default function GraphPage() {
         }));
 
         const links = data.links || [];
-        
+
         // Resolve relationships
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         links.forEach((l: any) => {
           const s = typeof l.source === "object" ? l.source.id : l.source;
           const t = typeof l.target === "object" ? l.target.id : l.target;
-          
+
           const sNode = nodes.find(n => n.id === s);
           const tNode = nodes.find(n => n.id === t);
-          
+
           if (sNode && tNode) {
-             if (sNode.type === "user") {
-               if (l.type === "STUDIED_IN" && tNode.type === "faculty") sNode.faculty = tNode.id;
-               if (l.type === "BELONGS_TO" && tNode.type === "department") sNode.department = tNode.id;
-               if (l.type === "WORKS_AS" && tNode.type === "company") sNode.company = tNode.id;
-             }
-             if (sNode.type === "department" && tNode.type === "faculty") {
-               sNode.faculty = tNode.id;
-             }
+            if (sNode.type === "user") {
+              if (l.type === "STUDIED_IN" && tNode.type === "faculty") sNode.faculty = tNode.id;
+              if (l.type === "BELONGS_TO" && tNode.type === "department") sNode.department = tNode.id;
+              if (l.type === "WORKS_AS" && tNode.type === "company") sNode.company = tNode.id;
+            }
+            if (sNode.type === "department" && tNode.type === "faculty") {
+              sNode.faculty = tNode.id;
+            }
           }
         });
 
         // Assign colors based on Faculty cluster
         const FACULTY_COLORS = [
-          "#ef4444", "#f97316", "#eab308", "#84cc16", "#22c55e", 
-          "#14b8a6", "#06b6d4", "#3b82f6", "#6366f1", "#a855f7", 
+          "#ef4444", "#f97316", "#eab308", "#84cc16", "#22c55e",
+          "#14b8a6", "#06b6d4", "#3b82f6", "#6366f1", "#a855f7",
           "#d946ef", "#ec4899"
         ];
         const facultyColorMap = new Map<string, string>();
         let colorIndex = 0;
 
         nodes.forEach(n => {
-           if (n.type === "faculty" && !facultyColorMap.has(n.id)) {
-              facultyColorMap.set(n.id, FACULTY_COLORS[colorIndex % FACULTY_COLORS.length]);
-              colorIndex++;
-           }
+          if (n.type === "faculty" && !facultyColorMap.has(n.id)) {
+            facultyColorMap.set(n.id, FACULTY_COLORS[colorIndex % FACULTY_COLORS.length]);
+            colorIndex++;
+          }
         });
 
         nodes.forEach(n => {
-           if (n.type === "faculty") {
-              n.color = facultyColorMap.get(n.id) || "#10b981";
-           } else if (n.type === "user") {
-              n.color = n.faculty && facultyColorMap.has(n.faculty) ? facultyColorMap.get(n.faculty) : "#a78bfa";
-           } else if (n.type === "department") {
-              n.color = n.faculty && facultyColorMap.has(n.faculty) ? facultyColorMap.get(n.faculty) : "#3b82f6";
-           } else if (n.type === "company") {
-              n.color = "#f59e0b";
-           } else {
-              n.color = "#94a3b8";
-           }
+          if (n.type === "faculty") {
+            n.color = facultyColorMap.get(n.id) || "#10b981";
+          } else if (n.type === "user") {
+            n.color = n.faculty && facultyColorMap.has(n.faculty) ? facultyColorMap.get(n.faculty) : "#a78bfa";
+          } else if (n.type === "department") {
+            n.color = n.faculty && facultyColorMap.has(n.faculty) ? facultyColorMap.get(n.faculty) : "#3b82f6";
+          } else if (n.type === "company") {
+            n.color = "#f59e0b";
+          } else {
+            n.color = "#94a3b8";
+          }
         });
 
         setRawGraphData({ nodes, links });
@@ -219,7 +219,7 @@ export default function GraphPage() {
         if (n.id && /^\d{2}/.test(n.id)) {
           years.add(n.id.substring(0, 2));
         }
-        
+
         if (n.faculty) faculties.add(n.faculty);
         if (n.department && (!selectedFaculty || n.faculty === selectedFaculty)) depts.add(n.department);
         if (n.company) companies.add(n.company);
@@ -240,7 +240,7 @@ export default function GraphPage() {
   const displayData = useMemo(() => {
     // 1. Filter Nodes (User) based on search/dropdown criteria
     const validUserIds = new Set<string>();
-    
+
     rawGraphData.nodes.forEach(n => {
       if (n.type === "user") {
         const isYearValid = n.id && /^\d{2}/.test(n.id);
@@ -259,14 +259,14 @@ export default function GraphPage() {
     // 2. Filter Links (Only active types AND connecting valid nodes)
     const links = rawGraphData.links.filter(l => {
       if (!activeFilters[l.type as string]) return false;
-      
+
       const s = typeof l.source === "object" ? l.source.id : l.source;
       const t = typeof l.target === "object" ? l.target.id : l.target;
 
       // Check if the link connects to a valid user (or another non-user node, but user must be valid)
       const sourceUserValid = !rawGraphData.nodes.find(n => n.id === s && n.type === "user") || validUserIds.has(s);
       const targetUserValid = !rawGraphData.nodes.find(n => n.id === t && n.type === "user") || validUserIds.has(t);
-      
+
       return sourceUserValid && targetUserValid;
     });
 
@@ -374,10 +374,10 @@ export default function GraphPage() {
   // Count connections for selected node
   const connectionCount = selectedNode
     ? displayData.links.filter((l) => {
-        const srcId = typeof l.source === "object" ? l.source.id : l.source;
-        const tgtId = typeof l.target === "object" ? l.target.id : l.target;
-        return srcId === selectedNode.id || tgtId === selectedNode.id;
-      }).length
+      const srcId = typeof l.source === "object" ? l.source.id : l.source;
+      const tgtId = typeof l.target === "object" ? l.target.id : l.target;
+      return srcId === selectedNode.id || tgtId === selectedNode.id;
+    }).length
     : 0;
 
   return (
@@ -520,12 +520,12 @@ export default function GraphPage() {
                   ctx.textBaseline = "top";
                   const label = n.name && n.name !== n.id ? n.name.split(" ")[0] : n.id;
                   ctx.fillText(label, x, y + r + 2);
-                  
+
                   // วาด Tooltip ชื่อเต็มเวลา custom hover ทำงาน
                   if (highlightNodes.size > 0 && !isSelected) {
-                     // วาดก็ต่อเมื่อ node นี้คือ node ตรงกลางที่โดนชี้
-                     // ใน hover mode เรามีเพื่อนบ้าน แต่ node หลักมันจะไม่มี flag บอกโดยตรง แต่อยู่ใน highlightNodes
-                     // ซึ่งก็โอเค มันจะขึ้นป้ายเหนือ node 
+                    // วาดก็ต่อเมื่อ node นี้คือ node ตรงกลางที่โดนชี้
+                    // ใน hover mode เรามีเพื่อนบ้าน แต่ node หลักมันจะไม่มี flag บอกโดยตรง แต่อยู่ใน highlightNodes
+                    // ซึ่งก็โอเค มันจะขึ้นป้ายเหนือ node 
                   }
                 }
               }}
@@ -559,7 +559,7 @@ export default function GraphPage() {
                 const end = (link as GraphLink).target as GraphNode;
                 if (typeof start !== 'object' || typeof end !== 'object') return;
 
-                let label = (link as GraphLink).type;
+                let label = (link as GraphLink).type || "";
                 if (label === "KNOWS") label = "รู้จักกัน";
                 else if (label === "STUDIED_IN") label = "เรียนคณะ";
                 else if (label === "WORKS_AS") label = "ทำงานที่";
@@ -572,21 +572,21 @@ export default function GraphPage() {
                 ctx.fillStyle = "#cbd5e1"; // slate-300
                 ctx.textAlign = "center";
                 ctx.textBaseline = "middle";
-                
+
                 const angle = Math.atan2(end.y! - start.y!, end.x! - start.x!);
                 ctx.save();
                 ctx.translate(x, y);
-                if (angle > Math.PI/2 || angle < -Math.PI/2) {
-                   ctx.rotate(angle + Math.PI);
+                if (angle > Math.PI / 2 || angle < -Math.PI / 2) {
+                  ctx.rotate(angle + Math.PI);
                 } else {
-                   ctx.rotate(angle);
+                  ctx.rotate(angle);
                 }
-                
+
                 // Draw text background for readability
                 const textWidth = ctx.measureText(label).width;
                 ctx.fillStyle = "rgba(15, 23, 42, 0.7)"; // bg-slate-900
-                ctx.fillRect(-textWidth/2 - 1, -3, textWidth + 2, 6);
-                
+                ctx.fillRect(-textWidth / 2 - 1, -3, textWidth + 2, 6);
+
                 ctx.fillStyle = "#cbd5e1";
                 ctx.fillText(label, 0, 0);
                 ctx.restore();
@@ -693,19 +693,18 @@ export default function GraphPage() {
                 {Object.entries(activeFilters).map(([rel, isActive]) => (
                   <button key={rel}
                     onClick={() => setActiveFilters(prev => ({ ...prev, [rel]: !prev[rel] }))}
-                    className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors border text-left ${
-                      isActive
-                        ? "bg-violet-500/20 text-violet-300 border-violet-500/50 hover:bg-violet-500/30"
-                        : "bg-slate-900/50 text-slate-400 border-slate-700/50 hover:bg-slate-800"
-                    }`}>
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors border text-left ${isActive
+                      ? "bg-violet-500/20 text-violet-300 border-violet-500/50 hover:bg-violet-500/30"
+                      : "bg-slate-900/50 text-slate-400 border-slate-700/50 hover:bg-slate-800"
+                      }`}>
                     <div className={`w-3 h-3 rounded-sm flex items-center justify-center transition-colors ${isActive ? "bg-violet-500" : "border border-slate-500"}`}>
                       {isActive && <svg className="w-2 h-2 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
                     </div>
                     <span>
                       {rel === "KNOWS" ? "รู้จักกัน (KNOWS)" :
-                       rel === "STUDIED_IN" ? "เรียนที่คณะ (STUDIED_IN)" :
-                       rel === "BELONGS_TO" ? "สังกัดสาขา (BELONGS_TO)" :
-                       "ทำงานที่ (WORKS_AS)"}
+                        rel === "STUDIED_IN" ? "เรียนที่คณะ (STUDIED_IN)" :
+                          rel === "BELONGS_TO" ? "สังกัดสาขา (BELONGS_TO)" :
+                            "ทำงานที่ (WORKS_AS)"}
                     </span>
                   </button>
                 ))}
@@ -727,12 +726,11 @@ export default function GraphPage() {
               <div className="bg-slate-800/60 backdrop-blur border border-violet-500/30 rounded-xl p-4 flex-1 overflow-y-auto">
                 <p className="text-xs font-semibold text-violet-400 mb-3 uppercase tracking-wider">รายละเอียด</p>
                 <div className="flex items-center gap-3 mb-4">
-                  <div className={`w-12 h-12 rounded-full border-2 flex items-center justify-center overflow-hidden flex-shrink-0 ${
-                    selectedNode.type === "company" ? "border-amber-500/40 bg-amber-500/20" :
+                  <div className={`w-12 h-12 rounded-full border-2 flex items-center justify-center overflow-hidden flex-shrink-0 ${selectedNode.type === "company" ? "border-amber-500/40 bg-amber-500/20" :
                     selectedNode.type === "faculty" ? "border-green-500/40 bg-green-500/20" :
-                    selectedNode.type === "department" ? "border-blue-500/40 bg-blue-500/20" :
-                    "border-violet-500/40 bg-violet-500/20"
-                  }`}>
+                      selectedNode.type === "department" ? "border-blue-500/40 bg-blue-500/20" :
+                        "border-violet-500/40 bg-violet-500/20"
+                    }`}>
                     {selectedNode.type === "user" ? (
                       selectedNode.avatar ? (
                         <img src={selectedNode.avatar} alt={selectedNode.name || "avatar"} className="w-full h-full object-cover" />
