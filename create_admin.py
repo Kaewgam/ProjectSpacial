@@ -9,16 +9,19 @@ if User.objects.filter(student_id=student_id).exists():
 else:
     user = User.objects.create_user(
         student_id=student_id,
-        email=email,
         password=password,
-        first_name='Admin',
-        last_name='System',
-        role='ADMIN',
     )
-    # เปลี่ยน role โดยตรงเพราะ create_user อาจไม่ set role
     user.role = 'ADMIN'
     user.is_staff = True
     user.save()
+    
+    from accounts.models import UserProfile
+    UserProfile.objects.create(
+        user=user,
+        email=email,
+        first_name='Admin',
+        last_name='System'
+    )
     print(f"[OK] สร้างบัญชี Admin สำเร็จ!")
     print(f"     Student ID : {student_id}")
     print(f"     Email      : {email}")

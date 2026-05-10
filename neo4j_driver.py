@@ -16,6 +16,9 @@ driver = GraphDatabase.driver(
 )
 
 
+# 📌 [สำหรับตอนพรีเซนต์: หัวใจของการสร้างกราฟ (Sync User to Neo4j)]
+# ฟังก์ชันนี้ถูกเรียกใช้ตลอดเมื่อมีการ สมัครสมาชิก, แก้ไขโปรไฟล์, หรือกดปุ่ม Sync All Users จากหลังบ้าน
+# หน้าที่ของมันคือเอาข้อมูลศิษย์เก่า 1 คน มาปั้นเป็นจุด (Node) และลากเส้นความสัมพันธ์ (Edges) เข้าหาคณะ สาขา และบริษัท 
 def sync_user_to_neo4j(user):
     with driver.session() as session:
         profile = getattr(user, 'profile', None)
@@ -94,6 +97,9 @@ def clean_orphan_nodes():
             DELETE c
         """)
 
+# 📌 [สำหรับตอนพรีเซนต์: การเชื่อมโยงอัตโนมัติ (Auto Create Knows)]
+# ฟังก์ชันนี้ใช้หลักการ Graph Traversal ทำให้โหนดเชื่อมกันเอง
+# เช่น ถ้านาย A เรียนจบคณะเดียวกับนาย B ระบบจะลากเส้น [KNOWS] หากันให้อัตโนมัติ ทำให้เกิดเป็น "เครือข่าย" ขึ้นมา
 def auto_create_knows():
     """
     สร้าง KNOWS ระหว่าง User ที่มีความสัมพันธ์ร่วมกัน:
@@ -106,21 +112,32 @@ def auto_create_knows():
         session.run("""
             MATCH (u1:User)-[:STUDIED_IN]->(f:Faculty)<-[:STUDIED_IN]-(u2:User)
             WHERE u1 <> u2
-            MERGE (u1)-[:KNOWS]->(u2)
+            MERGE (u1)-[r:KNOWS]->(u2)
+            SET r.reason_faculty = f.name
         """)
 
         # 🏫 KNOWS จาก Department เดียวกัน
         session.run("""
             MATCH (u1:User)-[:BELONGS_TO]->(d:Department)<-[:BELONGS_TO]-(u2:User)
             WHERE u1 <> u2
-            MERGE (u1)-[:KNOWS]->(u2)
+            MERGE (u1)-[r:KNOWS]->(u2)
+            SET r.reason_department = d.name
         """)
 
         # 💼 KNOWS จาก Company เดียวกัน
         session.run("""
             MATCH (u1:User)-[:WORKS_AS]->(c:Company)<-[:WORKS_AS]-(u2:User)
             WHERE u1 <> u2
-            MERGE (u1)-[:KNOWS]->(u2)
+            MERGE (u1)-[r:KNOWS]->(u2)
+            SET r.reason_company = c.name
+        """)
+
+        # 🤝 KNOWS จากรุ่นเดียวกัน (รหัสนักศึกษา 2 ตัวแรก)
+        session.run("""
+            MATCH (u1:User), (u2:User)
+            WHERE u1 <> u2 AND left(u1.student_id, 2) = left(u2.student_id, 2)
+            MERGE (u1)-[r:KNOWS]->(u2)
+            SET r.reason_year = left(u1.student_id, 2)
         """)
 
 

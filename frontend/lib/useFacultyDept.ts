@@ -4,8 +4,8 @@
  */
 import { useState, useEffect } from "react";
 
-export interface FacultyOption    { id: number; name: string; }
-export interface DepartmentOption { id: number; name: string; short_name: string; code: string; faculty_id: number; }
+export interface FacultyOption    { id: string | number; name: string; }
+export interface DepartmentOption { id: string | number; name: string; short_name: string; code: string; faculty_id: string | number; }
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
 
@@ -27,7 +27,7 @@ async function loadData() {
   return fetchPromise;
 }
 
-export function useFacultyDept(facultyId?: number | null) {
+export function useFacultyDept(facultyId?: string | number | null) {
   const [faculties,    setFaculties]    = useState<FacultyOption[]>(cachedFaculties ?? []);
   const [departments,  setDepartments]  = useState<DepartmentOption[]>(cachedDepartments ?? []);
   const [loading, setLoading] = useState(!cachedFaculties);
@@ -48,7 +48,7 @@ export function useFacultyDept(facultyId?: number | null) {
 
   // Filter departments by selected faculty
   const filteredDepts = facultyId
-    ? departments.filter(d => d.faculty_id === facultyId)
+    ? departments.filter(d => String(d.faculty_id) === String(facultyId))
     : [];
 
   return { faculties, departments, filteredDepts, loading };

@@ -24,6 +24,9 @@ def test_protected(request):
         "user": request.user.student_id
     })
 
+# 📌 [สำหรับตอนพรีเซนต์: ระบบสมัครสมาชิก (Register)]
+# ฟังก์ชันนี้รับข้อมูลจากหน้าจอมาสร้าง User ใหม่ในตาราง PostgreSQL
+# เมื่อคำสั่ง serializer.save() ทำงานเสร็จ จะมี Signal ไปสั่งให้ Graph DB (Neo4j) สร้าง Node อัตโนมัติทันที
 @api_view(['POST'])
 def register(request):
     serializer = RegisterSerializer(data=request.data)
@@ -38,6 +41,9 @@ def register(request):
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+# 📌 [สำหรับตอนพรีเซนต์: ระบบค้นหาศิษย์เก่า (Filter & Search)]
+# ส่วนนี้คือระบบค้นหาแบบดั้งเดิม ใช้การ Query ฐานข้อมูลแบบตาราง (PostgreSQL) 
+# เหมาะสำหรับการหาข้อมูลที่เจาะจง (Exact Match) เช่น หากรองตาม 'คณะ' ก็จะใช้ __icontains ในการค้นหา
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def search_alumni(request):
@@ -175,6 +181,9 @@ def me_view(request):
     })
 
 
+# 📌 [สำหรับตอนพรีเซนต์: การจัดการโปรไฟล์ (Profile Update)]
+# ฟังก์ชันนี้ใช้รับข้อมูลการแก้ไขโปรไฟล์ (ประวัติส่วนตัว, การศึกษา, การทำงาน)
+# **จุดสำคัญ:** บรรทัดสุดท้ายของฟังก์ชันนี้จะมี user.save() ซึ่งจะไปสั่งให้ Neo4j อัปเดตโครงสร้างกราฟใหม่
 @api_view(['PATCH'])
 @permission_classes([IsAuthenticated])
 def update_profile(request):

@@ -7,24 +7,22 @@ from neo4j_driver import sync_user_to_neo4j, delete_user_from_neo4j
 import uuid
 
 class UserManager(BaseUserManager):
-    def create_user(self, student_id, email, password=None, **extra_fields):
+    def create_user(self, student_id, password=None, **extra_fields):
         if not student_id:
             raise ValueError("Student ID is required")
 
-        email = self.normalize_email(email)
         user = self.model(
             student_id=student_id,
-            email=email,
             **extra_fields
         )
         user.set_password(password)
         user.save(using=self._db)
         return user
 
-    def create_superuser(self, student_id, email, password=None, **extra_fields):
+    def create_superuser(self, student_id, password=None, **extra_fields):
         extra_fields.setdefault('is_staff', True)
         extra_fields.setdefault('is_superuser', True)
-        return self.create_user(student_id, email, password, **extra_fields)
+        return self.create_user(student_id, password, **extra_fields)
 
 
 class Faculty(models.Model):

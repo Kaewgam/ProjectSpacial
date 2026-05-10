@@ -36,6 +36,10 @@ interface GraphLink {
   source: string | GraphNode;
   target: string | GraphNode;
   type?: string;        // "KNOWS" | "STUDIED_IN" | "BELONGS_TO" | "WORKS_AS"
+  reason_faculty?: string;
+  reason_department?: string;
+  reason_company?: string;
+  reason_year?: string;
 }
 
 interface GraphData {
@@ -87,6 +91,9 @@ function LegendItem({ color, label }: { color: string; label: string }) {
 }
 
 // ─── Main Page ────────────────────────────────────────
+// 📌 [สำหรับตอนพรีเซนต์: หน้าเครือข่ายศิษย์เก่า (Graph Tracking)]
+// นี่คือหน้าแสดงผล Graph Database (Neo4j) ที่ดึงข้อมูลมาวาดเป็น Topology ด้วย react-force-graph-2d
+// จะมี Event onClick / onHover เพื่อโชว์รายละเอียดความสัมพันธ์ด้านขวามือ
 export default function GraphPage() {
   const [rawGraphData, setRawGraphData] = useState<GraphData>({ nodes: [], links: [] });
   const [activeFilters, setActiveFilters] = useState<Record<string, boolean>>({
@@ -180,15 +187,15 @@ export default function GraphPage() {
 
         nodes.forEach(n => {
           if (n.type === "faculty") {
-            n.color = facultyColorMap.get(n.id) || "#10b981";
-          } else if (n.type === "user") {
-            n.color = n.faculty && facultyColorMap.has(n.faculty) ? facultyColorMap.get(n.faculty) : "#a78bfa";
+            n.color = "#ec4899"; // Pink
           } else if (n.type === "department") {
-            n.color = n.faculty && facultyColorMap.has(n.faculty) ? facultyColorMap.get(n.faculty) : "#3b82f6";
+            n.color = "#3b82f6"; // Blue
           } else if (n.type === "company") {
-            n.color = "#f59e0b";
+            n.color = "#f59e0b"; // Orange
+          } else if (n.type === "user") {
+            n.color = "#a78bfa"; // Purple
           } else {
-            n.color = "#94a3b8";
+            n.color = "#94a3b8"; // Slate
           }
         });
 
@@ -298,6 +305,23 @@ export default function GraphPage() {
     return { nodes, links };
   }, [rawGraphData, activeFilters, selectedYears, selectedFaculty, selectedDept, occupationSearch, companySearch]);
 
+  // ── Adjust Physics to spread nodes ──
+  useEffect(() => {
+    // ต้องใส่ Timeout เล็กน้อยเพื่อให้ react-force-graph สร้าง Simulation ให้เสร็จก่อน
+    const timer = setTimeout(() => {
+      if (graphRef.current) {
+        // เพิ่มแรงผลักให้จุดกระจายออกจากกัน (ยิ่งติดลบเยอะ ยิ่งผลักแรง)
+        graphRef.current.d3Force('charge')?.strength(-600);
+        // เพิ่มระยะความยาวของเส้น
+        graphRef.current.d3Force('link')?.distance(50);
+        // สั่งให้กราฟขยับใหม่ตามสูตรฟิสิกส์ข้างบน
+        graphRef.current.d3ReheatSimulation();
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [displayData]);
+
   // Highlight on hover
   const handleNodeHover = useCallback(
     (node: GraphNode | null) => {
@@ -371,14 +395,26 @@ export default function GraphPage() {
     handleNodeHover(nearest);
   }, [getNearestNode, handleNodeHover]);
 
-  // Count connections for selected node
-  const connectionCount = selectedNode
-    ? displayData.links.filter((l) => {
+  // Count and list connections for selected node
+  const connectionsList = useMemo(() => {
+    if (!selectedNode) return [];
+    const list: { node: GraphNode; type: string; link: GraphLink }[] = [];
+    displayData.links.forEach((l) => {
       const srcId = typeof l.source === "object" ? l.source.id : l.source;
       const tgtId = typeof l.target === "object" ? l.target.id : l.target;
-      return srcId === selectedNode.id || tgtId === selectedNode.id;
-    }).length
-    : 0;
+
+      if (srcId === selectedNode.id) {
+        const targetNode = displayData.nodes.find(n => n.id === tgtId);
+        if (targetNode) list.push({ node: targetNode, type: l.type || 'UNKNOWN', link: l });
+      } else if (tgtId === selectedNode.id) {
+        const sourceNode = displayData.nodes.find(n => n.id === srcId);
+        if (sourceNode) list.push({ node: sourceNode, type: l.type || 'UNKNOWN', link: l });
+      }
+    });
+    return list;
+  }, [selectedNode, displayData]);
+
+  const connectionCount = connectionsList.length;
 
   return (
     <div className="min-h-screen bg-[#080b14] flex flex-col text-white">
@@ -712,9 +748,10 @@ export default function GraphPage() {
               <div className="mt-3 pt-3 border-t border-slate-700/50">
                 <p className="text-xs font-semibold text-slate-400 mb-2">สัญลักษณ์สี</p>
                 <div className="flex flex-col gap-1.5">
-                  <LegendItem color="linear-gradient(135deg, #ef4444, #3b82f6, #10b981)" label="บุคคล / สาขา (กลุ่มสีตามคณะ)" />
-                  <LegendItem color="#a78bfa" label="บุคคล (ไม่ระบุคณะ)" />
-                  <LegendItem color="#f59e0b" label="หน่วยงาน (Company)" />
+                  <LegendItem color="#ec4899" label="คณะ (Faculty)" />
+                  <LegendItem color="#3b82f6" label="สาขาวิชา (Department)" />
+                  <LegendItem color="#f59e0b" label="บริษัท / หน่วยงาน (Company)" />
+                  <LegendItem color="#a78bfa" label="ศิษย์เก่า (User)" />
                 </div>
               </div>
             </div>
@@ -733,7 +770,7 @@ export default function GraphPage() {
                     }`}>
                     {selectedNode.type === "user" ? (
                       selectedNode.avatar ? (
-                        <img src={selectedNode.avatar} alt={selectedNode.name || "avatar"} className="w-full h-full object-cover" />
+                        <img src={selectedNode.avatar.startsWith('http') ? selectedNode.avatar : `${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}${selectedNode.avatar.startsWith('/') ? '' : '/'}${selectedNode.avatar}`} alt={selectedNode.name || "avatar"} className="w-full h-full object-cover" />
                       ) : (
                         <span className="text-violet-300 font-bold text-lg">
                           {selectedNode.name ? selectedNode.name.charAt(0).toUpperCase() : selectedNode.id.charAt(0).toUpperCase()}
@@ -789,6 +826,43 @@ export default function GraphPage() {
                   <p className="text-2xl font-bold text-violet-400">{connectionCount}</p>
                   <p className="text-xs text-slate-400">ความสัมพันธ์ที่แสดงอยู่</p>
                 </div>
+
+                {connectionsList.length > 0 && (
+                  <div className="mb-4">
+                    <p className="text-xs font-semibold text-slate-400 mb-2">เชื่อมโยงกับ ({connectionsList.length})</p>
+                    <div className="flex flex-col gap-1.5 max-h-40 overflow-y-auto pr-1 custom-scrollbar">
+                      {connectionsList.map((conn, idx) => (
+                        <div
+                          key={idx}
+                          onClick={() => { setSelectedNode(conn.node); handleNodeHover(conn.node); }}
+                          className="flex items-center justify-between bg-slate-900/40 rounded-lg p-2 border border-slate-700/50 hover:bg-slate-700 hover:border-slate-500 transition cursor-pointer"
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-300 whitespace-nowrap">
+                              {conn.type === "KNOWS" ? "รู้จัก" :
+                                conn.type === "STUDIED_IN" ? "เรียนคณะ" :
+                                  conn.type === "BELONGS_TO" ? "สาขาวิชา" :
+                                    conn.type === "WORKS_AS" ? "ทำงานที่" : conn.type}
+                            </span>
+                            <div className="flex flex-col min-w-0">
+                              <span className="text-xs text-slate-200 truncate">{conn.node.name || conn.node.id}</span>
+                              {conn.type === "KNOWS" && (conn.link.reason_faculty || conn.link.reason_department || conn.link.reason_company || conn.link.reason_year) && (
+                                <span className="text-[9px] text-slate-400 truncate">
+                                  {[
+                                    conn.link.reason_year ? `รุ่น ${conn.link.reason_year}` : null,
+                                    conn.link.reason_faculty ? `คณะเดียวกัน` : null,
+                                    conn.link.reason_department ? `สาขาเดียวกัน` : null,
+                                    conn.link.reason_company ? `ที่ทำงานเดียวกัน` : null
+                                  ].filter(Boolean).join(" • ")}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <button
                   onClick={() => { setSelectedNode(null); setHighlightNodes(new Set()); setHighlightLinks(new Set()); }}
                   className="w-full text-xs text-slate-400 hover:text-slate-200 transition py-1.5 border border-slate-700 rounded-lg hover:border-slate-500">

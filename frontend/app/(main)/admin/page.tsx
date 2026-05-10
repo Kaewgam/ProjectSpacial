@@ -56,6 +56,9 @@ function StatCard({
 
 
 // ─── Main Page ────────────────────────────────────────
+// 📌 [สำหรับตอนพรีเซนต์: แดชบอร์ดผู้ดูแลระบบ (Admin Dashboard)]
+// หน้านี้ดึงข้อมูล API สถิติมาแสดงผลเป็นกราฟและตัวเลขแบบ Real-time
+// เป็นศูนย์ควบคุมหลักที่แอดมินใช้ดูข้อมูลทั้งหมดในระบบครับ
 export default function AdminDashboard() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);

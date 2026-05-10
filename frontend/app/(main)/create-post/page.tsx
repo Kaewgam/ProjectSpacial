@@ -37,6 +37,9 @@ function Label({ icon, text, required }: { icon: React.ReactNode; text: string; 
 }
 
 // ─── Main Page ────────────────────────────────────────
+// 📌 [สำหรับตอนพรีเซนต์: หน้าสร้างโพสต์ความรู้ (Create Knowledge Post)]
+// หน้านี้ออกแบบมาให้แอดมินใช้งานเท่านั้น มีการรองรับการอัปโหลดไฟล์ภาพปก (Cover Image) 
+// และส่งข้อมูลแบบ FormData ไปยัง Backend ครับ
 export default function CreatePostPage() {
   const router  = useRouter();
   const { user, loading: authLoading } = useAuth();

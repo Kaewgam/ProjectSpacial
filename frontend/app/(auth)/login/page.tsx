@@ -6,6 +6,9 @@ import toast, { Toaster } from "react-hot-toast";
 import { FaEye, FaEyeSlash, FaUserGraduate } from "react-icons/fa";
 import api from "@/lib/api";
 
+// 📌 [สำหรับตอนพรีเซนต์: หน้า Login]
+// หน้านี้ทำหน้าที่รับรหัสนักศึกษาและรหัสผ่าน ส่งไปตรวจสอบกับ Backend
+// ถ้าถูกต้อง จะได้ JWT Token กลับมาเก็บใน localStorage เพื่อใช้ยืนยันตัวตนในหน้าอื่นๆ ครับ
 export default function LoginPage() {
     const router = useRouter();
 

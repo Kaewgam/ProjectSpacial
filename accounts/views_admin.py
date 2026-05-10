@@ -26,6 +26,9 @@ def is_admin(request):
 # 1. Stats Overview
 # ─────────────────────────────────────────────────────────────
 
+# 📌 [สำหรับตอนพรีเซนต์: แดชบอร์ดแอดมิน (Admin Stats)]
+# ใช้สรุปตัวเลขสถิติทั้งหมด (Dashboard) โดยใช้คำสั่ง F() และ Count() ของ PostgreSQL 
+# ช่วยให้คำนวณข้อมูลระดับหมื่น/แสนบรรทัดได้เร็วมาก โดยไม่ต้องดึงข้อมูลออกมาวนลูปใน Python
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def admin_stats(request):
@@ -500,6 +503,9 @@ def admin_neo4j_cleanup(request):
     })
 
 
+# 📌 [สำหรับตอนพรีเซนต์: ปุ่ม Sync All Users]
+# กรณีฉุกเฉิน (ไฟตก, เน็ตหลุด, อัปเดตตารางใหม่) ทำให้ 2 Database ข้อมูลไม่ตรงกัน
+# แอดมินสามารถกดปุ่มนี้เพื่อกวาดข้อมูลจาก PostgreSQL ทั้งหมด เอาไปวาดกราฟ Neo4j ใหม่ให้ถูกต้องแบบ 100%
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def admin_neo4j_syncall(request):

@@ -12,6 +12,9 @@ PASSWORD = os.getenv("NEO4J_PASSWORD", "")
 driver = GraphDatabase.driver(URI, auth=(USER, PASSWORD))
 
 
+# 📌 [สำหรับตอนพรีเซนต์: โหลดข้อมูลกราฟความสัมพันธ์ (Graph Tracking)]
+# API ตัวนี้เป็นพระเอกของหน้าเครือข่าย ทำหน้าที่วิ่งไปดึงข้อมูล Node และเส้น (Relationship) ทั้งหมดจาก Neo4j
+# แล้วเอามาแปลงเป็น JSON โยนกลับไปให้หน้าเว็บวาดเป็นรูปใยแมงมุมครับ
 def get_graph_data(request):
     with driver.session() as session:
         # ดึง Node ทั้งหมด (ไม่เอา Node ขยะที่ไม่มีเส้นเชื่อม ยกเว้น User)
@@ -54,6 +57,7 @@ def get_graph_data(request):
                 "id": node_id,
                 "name": node.get("name", node_id),
                 "type": node_type,
+                "avatar": node.get("avatar"),
                 "faculty": node.get("faculty"),
                 "department": node.get("department"),
                 "occupation": node.get("occupation"),
@@ -88,6 +92,10 @@ def get_graph_data(request):
                 "source": n1_id,
                 "target": n2_id,
                 "type": r_type,
+                "reason_faculty": record["r"].get("reason_faculty"),
+                "reason_department": record["r"].get("reason_department"),
+                "reason_company": record["r"].get("reason_company"),
+                "reason_year": record["r"].get("reason_year"),
             })
 
         return JsonResponse({

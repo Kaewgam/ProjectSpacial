@@ -144,6 +144,8 @@ function AlumniCard({ alum }: { alum: AlumniResult }) {
 }
 
 // ─── Main Page ────────────────────────────────────────
+// 📌 [สำหรับตอนพรีเซนต์: หน้าค้นหาศิษย์เก่า (Filter & Search)]
+// หน้านี้ออกแบบมาเพื่อให้ค้นหาและกรองข้อมูลแบบมีเงื่อนไข (เช่น คณะ, สาขา) จากตาราง PostgreSQL ได้อย่างรวดเร็ว
 export default function SearchPage() {
     const [query, setQuery] = useState("");
     const [faculty, setFaculty] = useState("");
