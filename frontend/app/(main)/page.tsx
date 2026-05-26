@@ -5,7 +5,9 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import api from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
-import { X, Pencil } from "lucide-react";
+import { X, Pencil, Award, Trophy, Building2, Calendar } from "lucide-react";
+import { CATEGORIES, HallOfFameEntry, HallOfFameModal } from "@/components/HallOfFameModal";
+import { FacebookImageGrid } from "@/components/FacebookImageGrid";
 
 // ─── Types ───────────────────────────────────────────
 interface Post {
@@ -19,6 +21,7 @@ interface Post {
   pinned:      boolean;
   is_active?:  boolean;
   cover_image: string | null;
+  images?:     string[];
 }
 
 interface CategoryDef {
@@ -42,7 +45,11 @@ function PinnedCard({ item, onClick, styleMap }: { item: Post; onClick: () => vo
       className="bg-white border border-gray-200 rounded-2xl p-6 hover:shadow-md hover:border-violet-200 transition-all group cursor-pointer relative overflow-hidden"
     >
       <div className="absolute top-0 left-0 right-0 h-1 rounded-t-2xl" style={{ background: style.dot }} />
-      {item.cover_image && (
+      {item.images && item.images.length > 0 ? (
+        <div className="mb-4">
+          <FacebookImageGrid images={item.images} disableFullscreen />
+        </div>
+      ) : item.cover_image && (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={item.cover_image} alt={item.title} className="w-full h-36 object-cover rounded-xl mb-4" />
       )}
@@ -84,7 +91,9 @@ function NewsCard({ item, onClick, styleMap }: { item: Post; onClick: () => void
       onClick={onClick}
       className="bg-white border border-gray-100 rounded-xl overflow-hidden hover:shadow-md hover:border-gray-200 transition-all group cursor-pointer"
     >
-      {item.cover_image && (
+      {item.images && item.images.length > 0 ? (
+        <FacebookImageGrid images={item.images} disableFullscreen />
+      ) : item.cover_image && (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={item.cover_image} alt={item.title} className="w-full h-36 object-cover" />
       )}
@@ -104,7 +113,7 @@ function NewsCard({ item, onClick, styleMap }: { item: Post; onClick: () => void
           {item.title}
         </h3>
         <p className="text-gray-400 text-xs leading-relaxed line-clamp-2 mb-3">
-          {item.excerpt || item.content.slice(0, 80)}
+          {item.content ? (item.content.length > 100 ? item.content.substring(0, 100) + "..." : item.content) : ""}
         </p>
         <div className="flex items-center justify-between border-t border-gray-50 pt-3">
           <span className="text-xs text-gray-400">{item.author || "Admin"}</span>
@@ -131,6 +140,17 @@ export default function Home() {
   const [page,     setPage]     = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
+  const [hallOfFame, setHallOfFame] = useState<HallOfFameEntry[]>([]);
+  const [selectedHof, setSelectedHof] = useState<HallOfFameEntry | null>(null);
+
+  // ── ดึงหอเกียรติยศ ──
+  const fetchHallOfFame = useCallback(async () => {
+    try {
+      const res = await api.get("/api/hall-of-fame/");
+      // เอาแค่ 4 คนล่าสุด (หรือที่เรียงมาแล้ว) มาแสดง
+      setHallOfFame((res.data || []).slice(0, 4));
+    } catch { setHallOfFame([]); }
+  }, []);
 
   // ── ดึงโพสต์ปักหมุด (แยก request) ──
   const fetchPinned = useCallback(async () => {
@@ -153,7 +173,10 @@ export default function Home() {
     finally { setLoading(false); }
   }, []);
 
-  useEffect(() => { fetchPinned(); }, [fetchPinned]);
+  useEffect(() => { 
+    fetchPinned(); 
+    fetchHallOfFame();
+  }, [fetchPinned, fetchHallOfFame]);
 
   useEffect(() => {
     api.get("/api/posts/categories/").then(res => {
@@ -230,6 +253,66 @@ export default function Home() {
           </div>
         )}
 
+        {/* ─── Hall of Fame Section ─── */}
+        {hallOfFame.length > 0 && (
+          <div className="mb-10">
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-3 flex-1">
+                <h2 className="text-base font-bold text-gray-700">🏆 ศิษย์เก่าดีเด่น</h2>
+                <div className="flex-1 h-px bg-gray-200 mr-4" />
+              </div>
+              <Link href="/hall-of-fame" className="text-sm font-semibold text-violet-600 hover:text-violet-700 transition flex-shrink-0 flex items-center gap-1">
+                ดูทั้งหมด <span className="text-lg leading-none">›</span>
+              </Link>
+            </div>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {hallOfFame.map(entry => {
+                const catStyle = CATEGORIES.find(c => c.value === entry.category) || CATEGORIES[0];
+                return (
+                  <div
+                    key={entry.id}
+                    onClick={() => setSelectedHof(entry)}
+                    className="bg-white border border-gray-100 shadow-sm hover:shadow-lg transition-all group relative cursor-pointer rounded-xl overflow-hidden"
+                  >
+                    {/* Top Image */}
+                    <div className="w-full aspect-[4/3] bg-gray-100 overflow-hidden relative">
+                      {entry.user.avatar ? (
+                          <img src={entry.user.avatar} alt={entry.user.first_name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                      ) : (
+                          <div className="w-full h-full flex flex-col items-center justify-center bg-gray-50 text-gray-400">
+                             <Award size={48} className="mb-2 opacity-50" />
+                             <span className="text-xs">ไม่มีรูปภาพ</span>
+                          </div>
+                      )}
+                    </div>
+                    
+                    {/* Content area */}
+                    <div className="p-5 flex flex-col min-h-[140px]">
+                        <h4 className="text-[16px] font-bold text-gray-800 mb-3 leading-snug line-clamp-2 group-hover:text-violet-600 transition-colors">
+                          {entry.user.first_name} {entry.user.last_name}
+                        </h4>
+                        <div className="space-y-2 mt-auto">
+                           <p className="text-xs text-gray-600 flex items-center gap-1.5 font-medium">
+                             <Trophy size={14} className="text-amber-500" /> {entry.category_display}
+                           </p>
+                           {entry.user.faculty && (
+                             <p className="text-xs text-gray-500 flex items-center gap-1.5">
+                               <Building2 size={14} className="text-gray-400" /> {entry.user.faculty}
+                             </p>
+                           )}
+                           <p className="text-xs text-gray-500 flex items-center gap-1.5">
+                             <Calendar size={14} className="text-gray-400" /> ศิษย์เก่าดีเด่น ปี {entry.award_year}
+                           </p>
+                        </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* ─── News Section ─── */}
         <div>
           <div className="flex items-center gap-3 mb-5">
@@ -300,8 +383,19 @@ export default function Home() {
         </div>
       </div>
 
-      {/* ─── Post Modal ─── */}
-      {selectedPost && <PostModal post={selectedPost} isAdmin={isAdmin} onClose={() => setSelectedPost(null)} styleMap={styleMap} />}
+      {/* ─── Modal Post ─── */}
+      {selectedPost && (
+        <PostModal post={selectedPost} isAdmin={isAdmin} onClose={() => setSelectedPost(null)} styleMap={styleMap} />
+      )}
+
+      {/* ─── Modal Hall of Fame ─── */}
+      {selectedHof && (
+        <HallOfFameModal 
+          entry={selectedHof}
+          catStyle={CATEGORIES.find(c => c.value === selectedHof.category) || CATEGORIES[0]}
+          onClose={() => setSelectedHof(null)}
+        />
+      )}
     </div>
   );
 }
@@ -320,36 +414,42 @@ function PostModal({ post, isAdmin, onClose, styleMap }: { post: Post; isAdmin?:
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-white w-full max-w-3xl max-h-[90vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
         
-        {/* Header/Image Area */}
-        <div className="relative flex-shrink-0">
-          {post.cover_image ? (
-            <div className="w-full h-64 sm:h-80 bg-gray-100">
-              <img src={post.cover_image} alt={post.title} className="w-full h-full object-cover" />
-            </div>
-          ) : (
-            <div className="w-full h-16 bg-gray-50 border-b border-gray-100" />
-          )}
-          
-          <div className="absolute top-4 right-4 flex gap-2">
-            {isAdmin && (
-              <Link 
-                href={`/edit-post/${post.id}`}
-                className="p-2 bg-black/40 hover:bg-black/60 text-white rounded-full backdrop-blur-md transition-colors shadow-sm"
-              >
-                <Pencil size={20} />
-              </Link>
-            )}
-            <button 
-              onClick={onClose}
+        {/* Floating Close Button */}
+        <div className="absolute top-4 right-4 flex gap-2 z-10">
+          {isAdmin && (
+            <Link 
+              href={`/edit-post/${post.id}`}
               className="p-2 bg-black/40 hover:bg-black/60 text-white rounded-full backdrop-blur-md transition-colors shadow-sm"
             >
-              <X size={20} />
-            </button>
-          </div>
+              <Pencil size={20} />
+            </Link>
+          )}
+          <button 
+            onClick={onClose}
+            className="p-2 bg-black/40 hover:bg-black/60 text-white rounded-full backdrop-blur-md transition-colors shadow-sm"
+          >
+            <X size={20} />
+          </button>
         </div>
 
-        {/* Content Area */}
-        <div className="flex-1 overflow-y-auto p-6 sm:p-8">
+        {/* Content Area (Scrollable) */}
+        <div className="flex-1 overflow-y-auto">
+          {/* Image Area */}
+          <div className="relative w-full">
+            {post.images && post.images.length > 0 ? (
+              <div className="w-full bg-gray-50 border-b border-gray-100 p-4 pt-0">
+                 <FacebookImageGrid images={post.images} />
+              </div>
+            ) : post.cover_image ? (
+              <div className="w-full h-64 sm:h-80 bg-gray-100">
+                <img src={post.cover_image} alt={post.title} className="w-full h-full object-cover" />
+              </div>
+            ) : (
+              <div className="w-full h-16 bg-gray-50 border-b border-gray-100" />
+            )}
+          </div>
+
+          <div className="p-6 sm:p-8">
           <div className="flex items-center gap-2 mb-4">
             <div className="w-2.5 h-2.5 rounded-full" style={{ background: style.dot }} />
             <span className={`text-xs font-bold ${style.text} ${style.bg} border ${style.border} px-2.5 py-1 rounded-full`}>
@@ -372,6 +472,7 @@ function PostModal({ post, isAdmin, onClose, styleMap }: { post: Post; isAdmin?:
           <div className="text-gray-700 whitespace-pre-wrap leading-relaxed text-[15px]">
             {post.content}
           </div>
+        </div>
         </div>
 
         {/* Footer */}

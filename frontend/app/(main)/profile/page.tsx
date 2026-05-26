@@ -13,6 +13,12 @@ import {
 import Link from "next/link";
 import { useFacultyDept } from "@/lib/useFacultyDept";
 
+const SUGGESTED_SKILLS = [
+    "Python", "JavaScript", "TypeScript", "React", "Node.js", "Java", "C#", "C++", 
+    "SQL", "NoSQL", "Docker", "Kubernetes", "AWS", "Machine Learning", "Data Analysis", 
+    "Project Management", "Digital Marketing", "Graphic Design", "UI/UX Design", "Communication"
+];
+
 export default function ProfilePage() {
     const { user, loading, logout, refreshUser } = useAuth();
     const router = useRouter();
@@ -23,12 +29,24 @@ export default function ProfilePage() {
     const [pendingAvatarFile, setPendingAvatarFile] = useState<File | null>(null);
     const [pendingAvatarPreview, setPendingAvatarPreview] = useState<string | null>(null);
 
+    interface PendingCert {
+        id: string;
+        name: string;
+        issue_year: string;
+        file: File;
+        previewUrl: string;
+    }
+    const [pendingCertificates, setPendingCertificates] = useState<PendingCert[]>([]);
+    const [showAllCerts, setShowAllCerts] = useState(false);
+
     const { faculties, departments } = useFacultyDept();
 
     const [form, setForm] = useState({
         prefix: "", first_name: "", last_name: "", email: "",
+        phone_number: "", github_link: "",
         educations: [] as { faculty_id: string | null, department_id: string | null, degree_level: string, graduation_year: string }[],
-        careers: [] as { occupation: string, company: string, is_current: boolean, start_year: string, end_year: string }[],
+        careers: [] as { occupation: string, company: string, work_email: string, is_current: boolean, start_year: string, end_year: string }[],
+        skills: [] as string[],
     });
 
     // Protected route
@@ -44,6 +62,8 @@ export default function ProfilePage() {
                 first_name: user.first_name ?? "",
                 last_name: user.last_name ?? "",
                 email: user.email ?? "",
+                phone_number: user.phone_number ?? "",
+                github_link: user.github_link ?? "",
                 educations: user.educations && user.educations.length > 0 ? user.educations.map(e => ({
                     faculty_id: e.faculty_id ? String(e.faculty_id) : null,
                     department_id: e.department_id ? String(e.department_id) : null,
@@ -53,13 +73,15 @@ export default function ProfilePage() {
                 careers: user.careers && user.careers.length > 0 ? user.careers.map(c => ({
                     occupation: c.occupation || "",
                     company: c.company || "",
+                    work_email: c.work_email || "",
                     is_current: c.is_current ?? true,
                     start_year: c.start_year || "",
                     end_year: c.end_year || ""
-                })) : [{ occupation: "", company: "", is_current: true, start_year: "", end_year: "" }],
+                })) : [{ occupation: "", company: "", work_email: "", is_current: true, start_year: "", end_year: "" }],
+                skills: user.skills || [],
             });
         }
-    }, [user]);
+    }, [user, editMode]);
 
     const set = (field: string, value: string) =>
         setForm((prev) => ({ ...prev, [field]: value }));
@@ -84,9 +106,28 @@ export default function ProfilePage() {
                 first_name: form.first_name,
                 last_name: form.last_name,
                 email: form.email,
+                phone_number: form.phone_number,
+                github_link: form.github_link,
                 educations: form.educations,
                 careers: form.careers,
+                skills: form.skills,
             });
+
+            // 2.5 Upload pending certificates
+            if (pendingCertificates.length > 0) {
+                const certPromises = pendingCertificates.map(cert => {
+                    const fd = new FormData();
+                    fd.append("name", cert.name);
+                    fd.append("issue_year", cert.issue_year);
+                    fd.append("image", cert.file);
+                    return api.post("/api/me/certificates/", fd, {
+                        headers: { "Content-Type": "multipart/form-data" }
+                    });
+                });
+                await Promise.all(certPromises);
+                setPendingCertificates([]);
+            }
+
             // 3. ดึง user ใหม่ → Navbar + ทุกที่อัปเดตทันที
             await refreshUser();
             toast.success("บันทึกข้อมูลสำเร็จ ✓");
@@ -103,19 +144,22 @@ export default function ProfilePage() {
             setForm({
                 prefix: user.prefix ?? "", first_name: user.first_name ?? "",
                 last_name: user.last_name ?? "", email: user.email ?? "",
+                phone_number: user.phone_number ?? "", github_link: user.github_link ?? "",
                 educations: user.educations && user.educations.length > 0 ? user.educations.map(e => ({
                     faculty_id: e.faculty_id ? String(e.faculty_id) : null,
                     department_id: e.department_id ? String(e.department_id) : null,
                     degree_level: e.degree_level || "", graduation_year: e.graduation_year || ""
                 })) : [{ faculty_id: null, department_id: null, degree_level: "", graduation_year: "" }],
                 careers: user.careers && user.careers.length > 0 ? user.careers.map(c => ({
-                    occupation: c.occupation || "", company: c.company || "",
+                    occupation: c.occupation || "", company: c.company || "", work_email: c.work_email || "",
                     is_current: c.is_current ?? true, start_year: c.start_year || "", end_year: c.end_year || ""
-                })) : [{ occupation: "", company: "", is_current: true, start_year: "", end_year: "" }],
+                })) : [{ occupation: "", company: "", work_email: "", is_current: true, start_year: "", end_year: "" }],
+                skills: user.skills || [],
             });
         }
         setPendingAvatarFile(null);
         setPendingAvatarPreview(null);
+        setPendingCertificates([]);
         setEditMode(false);
     };
 
@@ -297,6 +341,30 @@ export default function ProfilePage() {
                                     }
                                 </div>
 
+                                {/* เบอร์โทรศัพท์ */}
+                                <div>
+                                    <p className="text-xs text-gray-400 mb-1">เบอร์โทรศัพท์</p>
+                                    {editMode
+                                        ? <input type="tel" value={form.phone_number} onChange={(e) => set("phone_number", e.target.value)} placeholder="08X-XXX-XXXX" className={inputClass} />
+                                        : <p className="text-gray-800 font-medium text-sm">{user.phone_number || "—"}</p>
+                                    }
+                                </div>
+
+                                {/* ลิงก์ GitHub */}
+                                <div className="sm:col-span-2">
+                                    <p className="text-xs text-gray-400 mb-1">ลิงก์ GitHub / Portfolio</p>
+                                    {editMode
+                                        ? <input type="url" value={form.github_link} onChange={(e) => set("github_link", e.target.value)} placeholder="https://github.com/yourusername" className={inputClass} />
+                                        : user.github_link ? (
+                                            <a href={user.github_link} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-medium text-sm break-all">
+                                                {user.github_link}
+                                            </a>
+                                        ) : (
+                                            <p className="text-gray-800 font-medium text-sm">—</p>
+                                        )
+                                    }
+                                </div>
+
                             </div>
                         </div>
 
@@ -360,6 +428,8 @@ export default function ProfilePage() {
                                                                 setForm(p => ({ ...p, educations: newEdu }));
                                                             }} className={selectClass}>
                                                                 <option value="">เลือก...</option>
+                                                                <option value="ปวช.">ปวช.</option>
+                                                                <option value="ปวส.">ปวส.</option>
                                                                 <option value="ปริญญาตรี">ปริญญาตรี</option>
                                                                 <option value="ปริญญาโท">ปริญญาโท</option>
                                                                 <option value="ปริญญาเอก">ปริญญาเอก</option>
@@ -415,11 +485,25 @@ export default function ProfilePage() {
                                                 <div>
                                                     <p className="text-xs text-gray-400 mb-1">ตำแหน่ง / อาชีพ</p>
                                                     {editMode ? (
-                                                        <input value={car.occupation} onChange={(e) => {
-                                                            const newCar = [...form.careers];
-                                                            newCar[idx].occupation = e.target.value;
-                                                            setForm(p => ({ ...p, careers: newCar }));
-                                                        }} placeholder="เช่น วิศวกร" className={inputClass} />
+                                                        <>
+                                                            <input list="occupations-list" value={car.occupation} onChange={(e) => {
+                                                                const newCar = [...form.careers];
+                                                                newCar[idx].occupation = e.target.value;
+                                                                setForm(p => ({ ...p, careers: newCar }));
+                                                            }} placeholder="เลือกหรือพิมพ์ตำแหน่ง" className={inputClass} />
+                                                            <datalist id="occupations-list">
+                                                                <option value="Software Engineer" />
+                                                                <option value="Web Developer" />
+                                                                <option value="Data Scientist" />
+                                                                <option value="Data Analyst" />
+                                                                <option value="System Analyst" />
+                                                                <option value="Network Engineer" />
+                                                                <option value="Project Manager" />
+                                                                <option value="IT Support" />
+                                                                <option value="Programmer" />
+                                                                <option value="QA / Tester" />
+                                                            </datalist>
+                                                        </>
                                                     ) : (
                                                         <p className="text-gray-800 font-medium text-sm">{car.occupation || "—"}</p>
                                                     )}
@@ -434,6 +518,18 @@ export default function ProfilePage() {
                                                         }} placeholder="เช่น บริษัทเอบีซี" className={inputClass} />
                                                     ) : (
                                                         <p className="text-gray-800 font-medium text-sm">{car.company || "—"}</p>
+                                                    )}
+                                                </div>
+                                                <div>
+                                                    <p className="text-xs text-gray-400 mb-1">อีเมลบริษัท</p>
+                                                    {editMode ? (
+                                                        <input type="email" value={car.work_email} onChange={(e) => {
+                                                            const newCar = [...form.careers];
+                                                            newCar[idx].work_email = e.target.value;
+                                                            setForm(p => ({ ...p, careers: newCar }));
+                                                        }} placeholder="เช่น name@company.com" className={inputClass} />
+                                                    ) : (
+                                                        <p className="text-gray-800 font-medium text-sm">{car.work_email || "—"}</p>
                                                     )}
                                                 </div>
                                                 <div>
@@ -455,36 +551,186 @@ export default function ProfilePage() {
                                                             const newCar = [...form.careers];
                                                             newCar[idx].end_year = e.target.value;
                                                             setForm(p => ({ ...p, careers: newCar }));
-                                                        }} placeholder={car.is_current ? "ปัจจุบัน" : "พ.ศ."} disabled={car.is_current} className={`${inputClass} ${car.is_current ? "opacity-50" : ""}`} />
+                                                        }} placeholder="เช่น ปัจจุบัน หรือ 2567" className={inputClass} />
                                                     ) : (
-                                                        <p className="text-gray-800 font-medium text-sm">{car.is_current ? "ปัจจุบัน" : (car.end_year || "—")}</p>
+                                                        <p className="text-gray-800 font-medium text-sm">{car.end_year || "—"}</p>
                                                     )}
                                                 </div>
-                                                {editMode && (
-                                                    <div className="sm:col-span-2 flex items-center gap-2 mt-1">
-                                                        <input type="checkbox" id={`current-${idx}`} checked={car.is_current} onChange={(e) => {
-                                                            const newCar = [...form.careers];
-                                                            // ถ้าติ๊กถูก (เป็นงานปัจจุบัน) ให้ไปยกเลิกงานปัจจุบันอันอื่น
-                                                            if (e.target.checked) {
-                                                                newCar.forEach(c => c.is_current = false);
-                                                                newCar[idx].is_current = true;
-                                                                newCar[idx].end_year = "";
-                                                            } else {
-                                                                newCar[idx].is_current = false;
-                                                            }
-                                                            setForm(p => ({ ...p, careers: newCar }));
-                                                        }} className="w-4 h-4 text-[#414E51] rounded border-gray-300 focus:ring-[#414E51]" />
-                                                        <label htmlFor={`current-${idx}`} className="text-sm text-gray-600 cursor-pointer">งานปัจจุบัน (เลือกได้เพียง 1 รายการ)</label>
-                                                    </div>
-                                                )}
                                             </div>
                                         </div>
                                     ))}
                                     {editMode && (
-                                        <button onClick={() => setForm(p => ({ ...p, careers: [...p.careers, { occupation: "", company: "", is_current: true, start_year: "", end_year: "" }] }))}
+                                        <button onClick={() => setForm(p => ({ ...p, careers: [...p.careers, { occupation: "", company: "", work_email: "", is_current: true, start_year: "", end_year: "" }] }))}
                                             className="w-full py-2 border-2 border-dashed border-gray-300 rounded-xl text-gray-500 font-medium hover:border-[#414E51] hover:text-[#414E51] transition flex items-center justify-center gap-2">
                                             + เพิ่มประวัติการทำงาน
                                         </button>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                        {/* ทักษะและความสามารถ */}
+                        {user.role !== "ADMIN" && (
+                            <div className="bg-white rounded-2xl shadow-md p-6 mt-6">
+                                <div className="flex items-center justify-between mb-4">
+                                    <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                                        <BookOpen size={18} className="text-[#414E51]" /> ทักษะและความสามารถ
+                                    </h2>
+                                </div>
+                                <div className="space-y-4">
+                                    <div className="flex flex-wrap gap-2">
+                                        {form.skills.map((skill, idx) => (
+                                            <span key={idx} className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-sm font-medium border border-blue-200 flex items-center gap-2">
+                                                {skill}
+                                                {editMode && (
+                                                    <button onClick={() => setForm(p => ({ ...p, skills: p.skills.filter((_, i) => i !== idx) }))} className="hover:text-blue-900">
+                                                        <X size={14} />
+                                                    </button>
+                                                )}
+                                            </span>
+                                        ))}
+                                    </div>
+                                    {editMode && (
+                                        <div className="space-y-3">
+                                            <div className="grid sm:grid-cols-2 gap-4">
+                                                <div>
+                                                    <p className="text-sm text-gray-500 mb-2">เลือกจากทักษะที่แนะนำ</p>
+                                                    <select
+                                                        className={inputClass}
+                                                        onChange={(e) => {
+                                                            const val = e.target.value;
+                                                            if (val && !form.skills.includes(val)) {
+                                                                setForm(p => ({ ...p, skills: [...p.skills, val] }));
+                                                            }
+                                                            e.target.value = "";
+                                                        }}
+                                                    >
+                                                        <option value="">-- เลือกทักษะ --</option>
+                                                        {SUGGESTED_SKILLS.filter(s => !form.skills.includes(s)).map((skill, idx) => (
+                                                            <option key={idx} value={skill}>{skill}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm text-gray-500 mb-2">หรือพิมพ์เพิ่มเอง (กด Enter เพื่อเพิ่ม)</p>
+                                                    <input
+                                                        type="text"
+                                                        placeholder="พิมพ์ทักษะอื่นๆ..."
+                                                        className={inputClass}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === "Enter") {
+                                                                e.preventDefault();
+                                                                const val = e.currentTarget.value.trim();
+                                                                if (val && !form.skills.includes(val)) {
+                                                                    setForm(p => ({ ...p, skills: [...p.skills, val] }));
+                                                                }
+                                                                e.currentTarget.value = "";
+                                                            }
+                                                        }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* ใบประกาศ */}
+                        {user.role !== "ADMIN" && (
+                            <div className="bg-white rounded-2xl shadow-md p-6 mt-6">
+                                <div className="flex items-center justify-between mb-4">
+                                    <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                                        <Shield size={18} className="text-[#414E51]" /> ใบประกาศนียบัตร
+                                    </h2>
+                                    {user.certificates && user.certificates.length > 4 && !editMode && (
+                                        <button 
+                                            onClick={() => setShowAllCerts(!showAllCerts)}
+                                            className="text-sm font-medium text-emerald-600 hover:text-emerald-700 transition"
+                                        >
+                                            {showAllCerts ? "ย่อดูน้อยลง" : "ดูเพิ่มเติม"}
+                                        </button>
+                                    )}
+                                </div>
+                                <div className="space-y-4">
+                                    <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4">
+                                        {(showAllCerts || editMode ? user.certificates || [] : (user.certificates || []).slice(0, 4)).map((cert) => (
+                                            <div key={cert.id} className="relative bg-gray-50 p-4 rounded-xl border border-gray-200 flex flex-col items-center text-center">
+                                                {editMode && (
+                                                    <button onClick={async () => {
+                                                        if (confirm("ต้องการลบใบประกาศนี้ใช่หรือไม่?")) {
+                                                            try {
+                                                                await api.delete(`/api/me/certificates/${cert.id}/`);
+                                                                await refreshUser();
+                                                                toast.success("ลบใบประกาศสำเร็จ");
+                                                            } catch {
+                                                                toast.error("เกิดข้อผิดพลาด");
+                                                            }
+                                                        }
+                                                    }} className="absolute top-2 right-2 text-red-500 hover:text-red-700 bg-white shadow rounded-full p-1 transition" title="ลบข้อมูลนี้">
+                                                        <X size={14} />
+                                                    </button>
+                                                )}
+                                                {cert.image && (
+                                                    <div className="w-full h-32 mb-3 bg-gray-200 rounded-lg overflow-hidden flex items-center justify-center">
+                                                        <img src={cert.image} alt={cert.name} className="max-w-full max-h-full object-contain" />
+                                                    </div>
+                                                )}
+                                                <p className="text-gray-800 font-medium text-sm line-clamp-2">{cert.name}</p>
+                                                <p className="text-xs text-gray-500 mt-1">ปีที่ได้รับ: {cert.issue_year || "—"}</p>
+                                            </div>
+                                        ))}
+                                        {/* Pending certificates */}
+                                        {pendingCertificates.map((cert) => (
+                                            <div key={cert.id} className="relative bg-green-50 p-4 rounded-xl border border-green-200 flex flex-col items-center text-center">
+                                                <button onClick={() => setPendingCertificates(prev => prev.filter(c => c.id !== cert.id))} className="absolute top-2 right-2 text-red-500 hover:text-red-700 bg-white shadow rounded-full p-1 transition" title="ยกเลิกการเพิ่ม">
+                                                    <X size={14} />
+                                                </button>
+                                                <div className="w-full h-32 mb-3 bg-white rounded-lg overflow-hidden flex items-center justify-center border border-green-100">
+                                                    <img src={cert.previewUrl} alt={cert.name} className="max-w-full max-h-full object-contain" />
+                                                </div>
+                                                <p className="text-gray-800 font-medium text-sm line-clamp-2">{cert.name}</p>
+                                                <p className="text-xs text-gray-500 mt-1">ปีที่ได้รับ: {cert.issue_year || "—"}</p>
+                                                <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full mt-2 absolute top-2 left-2 font-medium">รอเพิ่ม...</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    {editMode && (
+                                        <form onSubmit={(e) => {
+                                            e.preventDefault();
+                                            const target = e.target as typeof e.target & {
+                                                name: { value: string };
+                                                issue_year: { value: string };
+                                                image: { files: FileList };
+                                            };
+                                            const file = target.image.files[0];
+                                            if (!file || !target.name.value) {
+                                                toast.error("กรุณากรอกชื่อและเลือกไฟล์รูปภาพ");
+                                                return;
+                                            }
+                                            
+                                            const newCert: PendingCert = {
+                                                id: Math.random().toString(36).substring(2, 9),
+                                                name: target.name.value,
+                                                issue_year: target.issue_year.value,
+                                                file: file,
+                                                previewUrl: URL.createObjectURL(file)
+                                            };
+                                            
+                                            setPendingCertificates(prev => [...prev, newCert]);
+                                            (e.target as HTMLFormElement).reset();
+                                        }} className="bg-gray-50 p-4 rounded-xl border border-dashed border-gray-300">
+                                            <p className="text-sm font-medium text-gray-700 mb-3">เพิ่มใบประกาศใหม่</p>
+                                            <div className="grid sm:grid-cols-2 gap-4">
+                                                <input name="name" required placeholder="ชื่อใบประกาศ" className={inputClass} />
+                                                <input name="issue_year" placeholder="ปีที่ได้รับ (พ.ศ.)" className={inputClass} />
+                                                <div className="sm:col-span-2">
+                                                    <input type="file" name="image" required accept="image/*" className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-[#414E51] file:text-white hover:file:bg-[#2b3436]" />
+                                                </div>
+                                            </div>
+                                            <button type="submit" className="mt-3 px-4 py-2 bg-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-300 transition flex items-center gap-2">
+                                                + เพิ่มใบประกาศลงคิว
+                                            </button>
+                                        </form>
                                     )}
                                 </div>
                             </div>

@@ -323,11 +323,24 @@ function CreateUserModal({
               </Field>
               <Field label="ตำแหน่ง" >
                 <input
+                  list="admin-occupations-list-create"
                   className={`${inputCls()}`}
                   value={form.occupation}
                   onChange={(e) => set("occupation", e.target.value)}
-                  placeholder="เช่น Software Engineer"
+                  placeholder="เลือกหรือพิมพ์ตำแหน่ง"
                 />
+                <datalist id="admin-occupations-list-create">
+                  <option value="Software Engineer" />
+                  <option value="Web Developer" />
+                  <option value="Data Scientist" />
+                  <option value="Data Analyst" />
+                  <option value="System Analyst" />
+                  <option value="Network Engineer" />
+                  <option value="Project Manager" />
+                  <option value="IT Support" />
+                  <option value="Programmer" />
+                  <option value="QA / Tester" />
+                </datalist>
               </Field>
               <Field label="หน่วยงาน / สังกัด" >
                 <input
@@ -627,10 +640,24 @@ function EditUserModal({
               </Field>
               <Field label="ตำแหน่ง" >
                 <input
+                  list="admin-occupations-list-edit"
                   className={`${inputCls()}`}
                   value={form.occupation}
                   onChange={(e) => set("occupation", e.target.value)}
+                  placeholder="เลือกหรือพิมพ์ตำแหน่ง"
                 />
+                <datalist id="admin-occupations-list-edit">
+                  <option value="Software Engineer" />
+                  <option value="Web Developer" />
+                  <option value="Data Scientist" />
+                  <option value="Data Analyst" />
+                  <option value="System Analyst" />
+                  <option value="Network Engineer" />
+                  <option value="Project Manager" />
+                  <option value="IT Support" />
+                  <option value="Programmer" />
+                  <option value="QA / Tester" />
+                </datalist>
               </Field>
               <Field label="หน่วยงาน / สังกัด" >
                 <input
@@ -834,7 +861,7 @@ export default function AdminUsersPage() {
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
           <input
             type="text"
-            placeholder="ค้นหา Student ID, ชื่อ, อีเมล..."
+            placeholder="ค้นหา ชื่อ, รหัสนักศึกษา..."
             value={q}
             onChange={(e) => setQ(e.target.value)}
             className="w-full pl-9 pr-4 py-2.5 bg-white border border-slate-300 rounded-xl
@@ -847,7 +874,7 @@ export default function AdminUsersPage() {
           className="bg-white border border-slate-300 rounded-xl px-4 py-2.5
                      text-sm text-slate-900 focus:outline-none focus:border-violet-500 transition focus:ring-1 focus:ring-violet-500"
         >
-          <option value="">ทุก Role</option>
+          <option value="">ทั้งหมด</option>
           <option value="ALUMNI">ALUMNI</option>
           <option value="ADMIN">ADMIN</option>
         </select>

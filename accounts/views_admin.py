@@ -659,3 +659,57 @@ def admin_neo4j_audit(request):
 
     except Exception as e:
         return Response({"connected": False, "error": str(e)})
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def admin_hall_of_fame_list(request):
+    if not is_admin(request):
+        return Response({"error": "ไม่มีสิทธิ์เข้าถึง"}, status=status.HTTP_403_FORBIDDEN)
+
+    from .models import HallOfFame
+    from .serializers import HallOfFameSerializer
+
+    if request.method == 'GET':
+        qs = HallOfFame.objects.select_related('user__profile').prefetch_related(
+            'user__educations__faculty_ref', 'user__educations__department_ref'
+        ).order_by('-award_year', 'category')
+        serializer = HallOfFameSerializer(qs, many=True, context={'request': request})
+        return Response(serializer.data)
+
+    elif request.method == 'POST':
+        serializer = HallOfFameSerializer(data=request.data, context={'request': request})
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET', 'PATCH', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def admin_hall_of_fame_detail(request, pk):
+    if not is_admin(request):
+        return Response({"error": "ไม่มีสิทธิ์เข้าถึง"}, status=status.HTTP_403_FORBIDDEN)
+
+    from .models import HallOfFame
+    from .serializers import HallOfFameSerializer
+
+    try:
+        instance = HallOfFame.objects.get(pk=pk)
+    except HallOfFame.DoesNotExist:
+        return Response({"error": "ไม่พบข้อมูล Hall of Fame นี้"}, status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == 'GET':
+        serializer = HallOfFameSerializer(instance, context={'request': request})
+        return Response(serializer.data)
+
+    elif request.method == 'PATCH':
+        serializer = HallOfFameSerializer(instance, data=request.data, partial=True, context={'request': request})
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    elif request.method == 'DELETE':
+        instance.delete()
+        return Response({"message": "ลบข้อมูลสำเร็จ"}, status=status.HTTP_200_OK)

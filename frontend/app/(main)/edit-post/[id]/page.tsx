@@ -47,14 +47,14 @@ export default function EditPostPage() {
   const [title, setTitle]       = useState("");
   const [category, setCategory] = useState("");
   const [categories, setCategories] = useState<CategoryDef[]>([]);
-  const [excerpt, setExcerpt]   = useState("");
   const [content, setContent]   = useState("");
   const [author, setAuthor]     = useState("");
   const [pinned, setPinned]     = useState(false);
   const [is_active, setIsActive] = useState(true);
   
-  const [coverImage, setCoverImage] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [images, setImages] = useState<File[]>([]);
+  const [previewUrls, setPreviewUrls] = useState<string[]>([]);
+  const [isReplacingImages, setIsReplacingImages] = useState(false);
   
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting]     = useState(false);
@@ -82,13 +82,14 @@ export default function EditPostPage() {
         const p = res.data;
         setTitle(p.title || "");
         setCategory(p.category || "");
-        setExcerpt(p.excerpt || "");
         setContent(p.content || "");
         setAuthor(p.author || "");
         setPinned(p.pinned || false);
         setIsActive(p.is_active ?? true);
-        if (p.cover_image) {
-           setPreviewUrl(p.cover_image);
+        if (p.images && p.images.length > 0) {
+           setPreviewUrls(p.images);
+        } else if (p.cover_image) {
+           setPreviewUrls([p.cover_image]);
         }
       })
       .catch(err => {
@@ -100,17 +101,34 @@ export default function EditPostPage() {
   }, [id, authLoading]);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.size > 5 * 1024 * 1024) { setError("รูปภาพต้องมีขนาดไม่เกิน 5MB"); return; }
-    setCoverImage(file);
-    setPreviewUrl(URL.createObjectURL(file));
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    for (const f of files) {
+      if (f.size > 5 * 1024 * 1024) { setError("รูปภาพแต่ละรูปต้องมีขนาดไม่เกิน 5MB"); return; }
+    }
+    
+    if (!isReplacingImages) {
+        setIsReplacingImages(true);
+        setImages(files);
+        setPreviewUrls(files.map(f => URL.createObjectURL(f)));
+    } else {
+        setImages(prev => [...prev, ...files]);
+        setPreviewUrls(prev => [...prev, ...files.map(f => URL.createObjectURL(f))]);
+    }
     setError("");
+    e.target.value = '';
   };
 
-  const removeImage = () => { 
-    setCoverImage(null); 
-    setPreviewUrl(null); 
+  const removeImage = (index: number) => { 
+    if (!isReplacingImages) {
+        // If clicking X on existing images, enter replace mode with no images
+        setIsReplacingImages(true);
+        setImages([]);
+        setPreviewUrls([]);
+    } else {
+        setImages(prev => prev.filter((_, i) => i !== index));
+        setPreviewUrls(prev => prev.filter((_, i) => i !== index));
+    }
   };
 
   const isValid = title.trim().length > 0 && category !== "" && content.trim().length > 0;
@@ -125,15 +143,14 @@ export default function EditPostPage() {
     try {
       const formData = new FormData();
       formData.append("title",    title.trim());
-      formData.append("excerpt",  excerpt.trim());
       formData.append("content",  content.trim());
       formData.append("category", category);
       formData.append("author",   author.trim());
       formData.append("pinned",   String(pinned));
       formData.append("is_active", String(is_active));
       
-      if (coverImage) {
-        formData.append("cover_image", coverImage);
+      if (isReplacingImages) {
+        images.forEach(img => formData.append("images", img));
       }
 
       await api.patch(`/api/posts/${id}/`, formData, {
@@ -269,21 +286,6 @@ export default function EditPostPage() {
           />
         </div>
 
-        {/* Excerpt */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-          <div className="flex items-center justify-between mb-2">
-            <Label icon={<AlignLeft size={15} />} text="สรุปย่อ (แสดงในหน้ารายการ)" />
-            <CharCounter current={excerpt.length} max={200} />
-          </div>
-          <textarea
-            value={excerpt}
-            onChange={(e) => setExcerpt(e.target.value.slice(0, 200))}
-            placeholder="เขียนสรุปเนื้อหาสั้นๆ..."
-            rows={3}
-            className="w-full text-sm text-gray-700 placeholder-gray-300 border-0 outline-none focus:ring-0 resize-none leading-relaxed"
-          />
-        </div>
-
         {/* Content */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
           <div className="flex items-center justify-between mb-2">
@@ -299,29 +301,33 @@ export default function EditPostPage() {
           />
         </div>
 
-        {/* Cover Image */}
+        {/* Images */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-          <Label icon={<ImagePlus size={15} />} text="รูปภาพประกอบ (อัปโหลดรูปใหม่จะแทนที่รูปเดิม)" />
-          {previewUrl ? (
-            <div className="relative rounded-xl overflow-hidden border border-gray-200">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={previewUrl} alt="cover" className="w-full h-52 object-cover" />
-              <button
-                type="button"
-                onClick={removeImage}
-                className="absolute top-3 right-3 bg-white/80 backdrop-blur hover:bg-white text-gray-700 rounded-full p-1.5 shadow transition"
-              >
-                <X size={16} />
-              </button>
+          <Label icon={<ImagePlus size={15} />} text="รูปภาพประกอบ (หากมีการอัปโหลดหรือลบ จะเป็นการแทนที่รูปเดิมทั้งหมด)" />
+          
+          {previewUrls.length > 0 && (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+              {previewUrls.map((url, i) => (
+                <div key={i} className="relative rounded-xl overflow-hidden border border-gray-200 aspect-square">
+                  <img src={url} alt={`preview-${i}`} className="w-full h-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => removeImage(i)}
+                    className="absolute top-2 right-2 bg-white/80 backdrop-blur hover:bg-white text-gray-700 rounded-full p-1.5 shadow transition"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              ))}
             </div>
-          ) : (
-            <label className="flex flex-col items-center justify-center w-full h-36 rounded-xl border-2 border-dashed border-gray-200 hover:border-violet-300 hover:bg-violet-50/30 cursor-pointer transition-all group">
-              <ImagePlus size={28} className="text-gray-300 group-hover:text-violet-400 mb-2 transition-colors" />
-              <span className="text-sm text-gray-400 group-hover:text-violet-500 transition-colors">คลิกเพื่ออัปโหลดรูปภาพ</span>
-              <span className="text-xs text-gray-300 mt-1">PNG, JPG ขนาดไม่เกิน 5MB</span>
-              <input type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
-            </label>
           )}
+          
+          <label className="flex flex-col items-center justify-center w-full h-32 rounded-xl border-2 border-dashed border-gray-200 hover:border-violet-300 hover:bg-violet-50/30 cursor-pointer transition-all group">
+            <ImagePlus size={28} className="text-gray-300 group-hover:text-violet-400 mb-2 transition-colors" />
+            <span className="text-sm text-gray-400 group-hover:text-violet-500 transition-colors">คลิกเพื่ออัปโหลดรูปภาพใหม่</span>
+            <span className="text-xs text-gray-300 mt-1">PNG, JPG ขนาดไม่เกิน 5MB</span>
+            <input type="file" multiple accept="image/*" className="hidden" onChange={handleImageChange} />
+          </label>
         </div>
 
         {/* Author + Pinned */}

@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
-import { LayoutDashboard, Users, Database, ChevronRight } from "lucide-react";
+import { LayoutDashboard, Users, Database, ChevronRight, Award } from "lucide-react";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -30,6 +30,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
     { href: "/admin/users", label: "จัดการบัญชี", icon: Users },
     { href: "/admin/neo4j", label: "Neo4j Tools", icon: Database },
+    { href: "/admin/hall-of-fame", label: "จัดการหอเกียรติยศ", icon: Award },
   ];
 
   return (

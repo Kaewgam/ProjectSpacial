@@ -18,8 +18,8 @@ export default function Register() {
         student_id: "",
         email: "",
         password: "",
-        faculty_id: null as number | null,
-        department_id: null as number | null,
+        faculty_id: null as string | null,
+        department_id: null as string | null,
         occupation: "",
         company: "",
     });
@@ -32,7 +32,7 @@ export default function Register() {
     const set = (field: string, value: string) =>
         setForm((prev) => ({ ...prev, [field]: value }));
 
-    const handleFacultyChange = (facultyId: number | null) => {
+    const handleFacultyChange = (facultyId: string | null) => {
         setForm((prev) => ({ ...prev, faculty_id: facultyId, department_id: null }));
     };
 
@@ -178,7 +178,7 @@ export default function Register() {
                                 <div className="relative">
                                     <select
                                         value={form.faculty_id ?? ""}
-                                        onChange={(e) => handleFacultyChange(e.target.value ? Number(e.target.value) : null)}
+                                        onChange={(e) => handleFacultyChange(e.target.value ? String(e.target.value) : null)}
                                         className={selectClass}
                                     >
                                         <option value="">เลือกคณะ</option>
@@ -194,7 +194,7 @@ export default function Register() {
                                 <div className="relative">
                                     <select
                                         value={form.department_id ?? ""}
-                                        onChange={(e) => setForm(prev => ({ ...prev, department_id: e.target.value ? Number(e.target.value) : null }))}
+                                        onChange={(e) => setForm(prev => ({ ...prev, department_id: e.target.value ? String(e.target.value) : null }))}
                                         disabled={!form.faculty_id}
                                         className={`${selectClass} ${!form.faculty_id ? "opacity-50 cursor-not-allowed" : ""}`}
                                     >
@@ -233,11 +233,24 @@ export default function Register() {
                                 <div className="relative">
                                     <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                                     <input
+                                        list="occupations-list"
                                         value={form.occupation}
                                         onChange={(e) => set("occupation", e.target.value)}
-                                        placeholder="เช่น วิศวกร, นักพัฒนาซอฟต์แวร์"
+                                        placeholder="เลือกหรือพิมพ์ตำแหน่ง"
                                         className={`${inputClass} pl-9`}
                                     />
+                                    <datalist id="occupations-list">
+                                        <option value="Software Engineer" />
+                                        <option value="Web Developer" />
+                                        <option value="Data Scientist" />
+                                        <option value="Data Analyst" />
+                                        <option value="System Analyst" />
+                                        <option value="Network Engineer" />
+                                        <option value="Project Manager" />
+                                        <option value="IT Support" />
+                                        <option value="Programmer" />
+                                        <option value="QA / Tester" />
+                                    </datalist>
                                 </div>
                             </div>
                             <div>

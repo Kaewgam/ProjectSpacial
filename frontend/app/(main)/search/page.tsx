@@ -4,6 +4,9 @@ import { useState, useEffect, useCallback } from "react";
 import { Search, ChevronLeft, ChevronRight, User, Briefcase, Building2, MapPin, SlidersHorizontal } from "lucide-react";
 import api from "@/lib/api";
 import { useFacultyDept } from "@/lib/useFacultyDept";
+import { useAuth } from "@/contexts/AuthContext";
+import { useRouter } from "next/navigation";
+import toast, { Toaster } from "react-hot-toast";
 
 // ─── Types ───────────────────────────────────────────
 interface AlumniResult {
@@ -30,13 +33,26 @@ const ROLE_LABELS: Record<string, { label: string; color: string }> = {
 
 // ─── Result Card ─────────────────────────────────────
 function AlumniCard({ alum }: { alum: AlumniResult }) {
+    const { user } = useAuth();
+    const router = useRouter();
     const roleInfo = ROLE_LABELS[alum.role] ?? { label: alum.role, color: "bg-gray-100 text-gray-600 border-gray-200" };
     const displayName = alum.first_name
         ? `${alum.first_name} ${alum.last_name ?? ""}`.trim()
         : alum.student_id;
 
+    const handleClick = () => {
+        if (!user) {
+            toast.error("กรุณาเข้าสู่ระบบเพื่อดูข้อมูลศิษย์เก่า");
+            return;
+        }
+        router.push(`/alumni/${alum.id}`);
+    };
+
     return (
-        <div className="bg-white border border-gray-100 rounded-2xl p-5 hover:shadow-md hover:border-gray-200 transition-all group">
+        <div 
+            onClick={handleClick}
+            className="bg-white border border-gray-100 rounded-2xl p-5 hover:shadow-md hover:border-violet-200 transition-all group cursor-pointer"
+        >
             <div className="flex items-start gap-4">
                 {/* Avatar */}
                 <div className="w-12 h-12 rounded-xl overflow-hidden flex-shrink-0 border border-gray-100">
@@ -211,6 +227,7 @@ export default function SearchPage() {
 
     return (
         <div className="min-h-screen bg-gray-50">
+            <Toaster position="top-center" />
 
             {/* ─── Header ─── */}
             <div className="bg-white border-b border-gray-200 shadow-sm">
@@ -259,7 +276,7 @@ export default function SearchPage() {
                                 >
                                     <option value="">ทุกสาขาวิชา</option>
                                     {filteredDepts.map((d) => (
-                                        <option key={d.id} value={d.name}>{d.name}</option>
+                                        <option key={d.id} value={d.original_name || d.name}>{d.name}</option>
                                     ))}
                                 </select>
                             </div>

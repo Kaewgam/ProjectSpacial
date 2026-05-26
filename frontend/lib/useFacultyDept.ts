@@ -5,7 +5,7 @@
 import { useState, useEffect } from "react";
 
 export interface FacultyOption    { id: string | number; name: string; }
-export interface DepartmentOption { id: string | number; name: string; short_name: string; code: string; faculty_id: string | number; }
+export interface DepartmentOption { id: string | number; name: string; original_name: string; short_name: string; code: string; faculty_id: string | number; }
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
 

@@ -38,7 +38,7 @@ def get_graph_data(request):
 
         def label_to_type(labels):
             """แปลง Neo4j labels → type string ที่ frontend ใช้"""
-            priority = ["User", "Faculty", "Department", "Company"]
+            priority = ["User", "Faculty", "Department", "Company", "Skill", "Occupation"]
             for p in priority:
                 if p in labels:
                     return p.lower()
@@ -95,6 +95,8 @@ def get_graph_data(request):
                 "reason_faculty": record["r"].get("reason_faculty"),
                 "reason_department": record["r"].get("reason_department"),
                 "reason_company": record["r"].get("reason_company"),
+                "reason_skill": record["r"].get("reason_skill"),
+                "reason_occupation": record["r"].get("reason_occupation"),
                 "reason_year": record["r"].get("reason_year"),
             })
 

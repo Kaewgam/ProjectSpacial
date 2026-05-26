@@ -40,6 +40,8 @@ interface GraphLink {
   reason_department?: string;
   reason_company?: string;
   reason_year?: string;
+  reason_skill?: string;
+  reason_occupation?: string;
 }
 
 interface GraphData {
@@ -101,6 +103,8 @@ export default function GraphPage() {
     STUDIED_IN: true,
     BELONGS_TO: true,
     WORKS_AS: true,
+    HAS_SKILL: true,
+    WORKS_AS_ROLE: true,
   });
   const [selectedYears, setSelectedYears] = useState<Set<string>>(new Set());
   const [selectedFaculty, setSelectedFaculty] = useState<string>("");
@@ -192,6 +196,10 @@ export default function GraphPage() {
             n.color = "#3b82f6"; // Blue
           } else if (n.type === "company") {
             n.color = "#f59e0b"; // Orange
+          } else if (n.type === "skill") {
+            n.color = "#10b981"; // Emerald Green
+          } else if (n.type === "occupation") {
+            n.color = "#ef4444"; // Red
           } else if (n.type === "user") {
             n.color = "#a78bfa"; // Purple
           } else {
@@ -284,13 +292,15 @@ export default function GraphPage() {
     if (activeFilters.STUDIED_IN) activeNodeTypes.add("faculty");
     if (activeFilters.BELONGS_TO) activeNodeTypes.add("department");
     if (activeFilters.WORKS_AS) activeNodeTypes.add("company");
+    if (activeFilters.HAS_SKILL) activeNodeTypes.add("skill");
+    if (activeFilters.WORKS_AS_ROLE) activeNodeTypes.add("occupation");
 
     const activeNodeIds = new Set<string>();
     rawGraphData.nodes.forEach((n) => {
       if (n.type === "user") {
         if (validUserIds.has(n.id)) activeNodeIds.add(n.id);
       } else if (activeNodeTypes.has(n.type as string)) {
-        // Show faculty/company ONLY if they are connected to valid users
+        // Show faculty/company/skill/occupation ONLY if they are connected to valid users
         const hasEdge = links.some((l) => {
           const s = typeof l.source === "object" ? l.source.id : l.source;
           const t = typeof l.target === "object" ? l.target.id : l.target;
@@ -300,9 +310,16 @@ export default function GraphPage() {
       }
     });
 
-    const nodes = rawGraphData.nodes.filter((n) => activeNodeIds.has(n.id));
+    const nodes = rawGraphData.nodes.filter(n => activeNodeIds.has(n.id));
 
-    return { nodes, links };
+    // To prevent d3-force mutation crashes when filtering, provide fresh link objects with string IDs
+    const safeLinks = links.map(l => ({
+      ...l,
+      source: typeof l.source === "object" ? (l.source as any).id : l.source,
+      target: typeof l.target === "object" ? (l.target as any).id : l.target
+    }));
+
+    return { nodes, links: safeLinks };
   }, [rawGraphData, activeFilters, selectedYears, selectedFaculty, selectedDept, occupationSearch, companySearch]);
 
   // ── Adjust Physics to spread nodes ──
@@ -600,6 +617,8 @@ export default function GraphPage() {
                 else if (label === "STUDIED_IN") label = "เรียนคณะ";
                 else if (label === "WORKS_AS") label = "ทำงานที่";
                 else if (label === "BELONGS_TO") label = "สาขาวิชา";
+                else if (label === "HAS_SKILL") label = "ทักษะ";
+                else if (label === "WORKS_AS_ROLE") label = "อาชีพ";
 
                 const x = start.x! + (end.x! - start.x!) / 2;
                 const y = start.y! + (end.y! - start.y!) / 2;
@@ -740,7 +759,9 @@ export default function GraphPage() {
                       {rel === "KNOWS" ? "รู้จักกัน (KNOWS)" :
                         rel === "STUDIED_IN" ? "เรียนที่คณะ (STUDIED_IN)" :
                           rel === "BELONGS_TO" ? "สังกัดสาขา (BELONGS_TO)" :
-                            "ทำงานที่ (WORKS_AS)"}
+                            rel === "WORKS_AS" ? "ทำงานที่ (WORKS_AS)" :
+                              rel === "HAS_SKILL" ? "ทักษะ (HAS_SKILL)" :
+                                rel === "WORKS_AS_ROLE" ? "อาชีพ (WORKS_AS_ROLE)" : rel}
                     </span>
                   </button>
                 ))}
@@ -751,6 +772,8 @@ export default function GraphPage() {
                   <LegendItem color="#ec4899" label="คณะ (Faculty)" />
                   <LegendItem color="#3b82f6" label="สาขาวิชา (Department)" />
                   <LegendItem color="#f59e0b" label="บริษัท / หน่วยงาน (Company)" />
+                  <LegendItem color="#ef4444" label="ตำแหน่งงาน (Occupation)" />
+                  <LegendItem color="#10b981" label="ทักษะ (Skill)" />
                   <LegendItem color="#a78bfa" label="ศิษย์เก่า (User)" />
                 </div>
               </div>
@@ -782,6 +805,10 @@ export default function GraphPage() {
                       <span className="text-2xl">🏛️</span>
                     ) : selectedNode.type === "department" ? (
                       <span className="text-2xl">📚</span>
+                    ) : selectedNode.type === "skill" ? (
+                      <span className="text-2xl">🎯</span>
+                    ) : selectedNode.type === "occupation" ? (
+                      <span className="text-2xl">💼</span>
                     ) : (
                       <span className="text-2xl">📍</span>
                     )}
@@ -842,17 +869,21 @@ export default function GraphPage() {
                               {conn.type === "KNOWS" ? "รู้จัก" :
                                 conn.type === "STUDIED_IN" ? "เรียนคณะ" :
                                   conn.type === "BELONGS_TO" ? "สาขาวิชา" :
-                                    conn.type === "WORKS_AS" ? "ทำงานที่" : conn.type}
+                                    conn.type === "WORKS_AS" ? "ทำงานที่" :
+                                      conn.type === "HAS_SKILL" ? "ทักษะ" :
+                                        conn.type === "WORKS_AS_ROLE" ? "อาชีพ" : conn.type}
                             </span>
                             <div className="flex flex-col min-w-0">
                               <span className="text-xs text-slate-200 truncate">{conn.node.name || conn.node.id}</span>
-                              {conn.type === "KNOWS" && (conn.link.reason_faculty || conn.link.reason_department || conn.link.reason_company || conn.link.reason_year) && (
+                              {conn.type === "KNOWS" && (conn.link.reason_faculty || conn.link.reason_department || conn.link.reason_company || conn.link.reason_year || conn.link.reason_skill || conn.link.reason_occupation) && (
                                 <span className="text-[9px] text-slate-400 truncate">
                                   {[
                                     conn.link.reason_year ? `รุ่น ${conn.link.reason_year}` : null,
                                     conn.link.reason_faculty ? `คณะเดียวกัน` : null,
                                     conn.link.reason_department ? `สาขาเดียวกัน` : null,
-                                    conn.link.reason_company ? `ที่ทำงานเดียวกัน` : null
+                                    conn.link.reason_company ? `ที่ทำงานเดียวกัน` : null,
+                                    conn.link.reason_skill ? `ทักษะเดียวกัน` : null,
+                                    conn.link.reason_occupation ? `อาชีพเดียวกัน` : null
                                   ].filter(Boolean).join(" • ")}
                                 </span>
                               )}

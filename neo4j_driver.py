@@ -47,7 +47,7 @@ def sync_user_to_neo4j(user):
 
         # Clear old relationships
         session.run("""
-            MATCH (u:User {student_id: $student_id})-[r:STUDIED_IN|BELONGS_TO|WORKS_AS]->()
+            MATCH (u:User {student_id: $student_id})-[r:STUDIED_IN|BELONGS_TO|WORKS_AS|HAS_SKILL]->()
             DELETE r
         """, student_id=user.student_id)
 
@@ -70,7 +70,7 @@ def sync_user_to_neo4j(user):
                         MERGE (u)-[:BELONGS_TO]->(d)
                     """, student_id=user.student_id, department_id=edu.department_ref.id, department=edu.department_ref.name)
 
-        # 💼 Company
+        # 💼 Company & Occupation
         if hasattr(user, 'careers'):
             for car in user.careers.all():
                 if car.company:
@@ -79,6 +79,22 @@ def sync_user_to_neo4j(user):
                         MERGE (c:Company {name: $company})
                         MERGE (u)-[:WORKS_AS]->(c)
                     """, student_id=user.student_id, company=car.company)
+                if car.occupation:
+                    session.run("""
+                        MATCH (u:User {student_id: $student_id})
+                        MERGE (o:Occupation {name: $occupation})
+                        MERGE (u)-[:WORKS_AS_ROLE]->(o)
+                    """, student_id=user.student_id, occupation=car.occupation)
+
+        # 🎯 Skills
+        if hasattr(user, 'skills'):
+            for us in user.skills.all():
+                if us.skill.name:
+                    session.run("""
+                        MATCH (u:User {student_id: $student_id})
+                        MERGE (s:Skill {name: $skill_name})
+                        MERGE (u)-[:HAS_SKILL]->(s)
+                    """, student_id=user.student_id, skill_name=us.skill.name)
 
     # 🤝 สร้าง KNOWS อัตโนมัติจาก Faculty / Department / Company เดียวกัน
     auto_create_knows()
@@ -88,13 +104,23 @@ def sync_user_to_neo4j(user):
 
 def clean_orphan_nodes():
     """
-    ลบ Company nodes ที่ไม่มี User คนไหนเชื่อมต่อแล้ว (Orphan nodes)
+    ลบ Company และ Skill nodes ที่ไม่มี User คนไหนเชื่อมต่อแล้ว (Orphan nodes)
     """
     with driver.session() as session:
         session.run("""
             MATCH (c:Company)
             WHERE NOT (c)--()
             DELETE c
+        """)
+        session.run("""
+            MATCH (s:Skill)
+            WHERE NOT (s)--()
+            DELETE s
+        """)
+        session.run("""
+            MATCH (o:Occupation)
+            WHERE NOT (o)--()
+            DELETE o
         """)
 
 # 📌 [สำหรับตอนพรีเซนต์: การเชื่อมโยงอัตโนมัติ (Auto Create Knows)]
@@ -111,7 +137,7 @@ def auto_create_knows():
         # 🎓 KNOWS จาก Faculty เดียวกัน
         session.run("""
             MATCH (u1:User)-[:STUDIED_IN]->(f:Faculty)<-[:STUDIED_IN]-(u2:User)
-            WHERE u1 <> u2
+            WHERE u1 <> u2 AND left(u1.student_id, 2) = left(u2.student_id, 2)
             MERGE (u1)-[r:KNOWS]->(u2)
             SET r.reason_faculty = f.name
         """)
@@ -119,7 +145,7 @@ def auto_create_knows():
         # 🏫 KNOWS จาก Department เดียวกัน
         session.run("""
             MATCH (u1:User)-[:BELONGS_TO]->(d:Department)<-[:BELONGS_TO]-(u2:User)
-            WHERE u1 <> u2
+            WHERE u1 <> u2 AND left(u1.student_id, 2) = left(u2.student_id, 2)
             MERGE (u1)-[r:KNOWS]->(u2)
             SET r.reason_department = d.name
         """)
@@ -127,9 +153,25 @@ def auto_create_knows():
         # 💼 KNOWS จาก Company เดียวกัน
         session.run("""
             MATCH (u1:User)-[:WORKS_AS]->(c:Company)<-[:WORKS_AS]-(u2:User)
-            WHERE u1 <> u2
+            WHERE u1 <> u2 AND left(u1.student_id, 2) = left(u2.student_id, 2)
             MERGE (u1)-[r:KNOWS]->(u2)
             SET r.reason_company = c.name
+        """)
+
+        # 🛠️ KNOWS จาก Occupation เดียวกัน
+        session.run("""
+            MATCH (u1:User)-[:WORKS_AS_ROLE]->(o:Occupation)<-[:WORKS_AS_ROLE]-(u2:User)
+            WHERE u1 <> u2 AND left(u1.student_id, 2) = left(u2.student_id, 2)
+            MERGE (u1)-[r:KNOWS]->(u2)
+            SET r.reason_occupation = o.name
+        """)
+
+        # 🎯 KNOWS จาก ทักษะ (Skill) เดียวกัน
+        session.run("""
+            MATCH (u1:User)-[:HAS_SKILL]->(s:Skill)<-[:HAS_SKILL]-(u2:User)
+            WHERE u1 <> u2 AND left(u1.student_id, 2) = left(u2.student_id, 2)
+            MERGE (u1)-[r:KNOWS]->(u2)
+            SET r.reason_skill = s.name
         """)
 
         # 🤝 KNOWS จากรุ่นเดียวกัน (รหัสนักศึกษา 2 ตัวแรก)

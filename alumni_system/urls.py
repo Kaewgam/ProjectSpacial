@@ -22,13 +22,16 @@ from accounts.views import (
     test_protected, register, search_alumni,
     me_view, update_profile, upload_avatar,
     request_password_reset, confirm_password_reset, graph_page,
-    list_faculties, list_departments,
+    list_faculties, list_departments, list_hall_of_fame,
+    add_certificate, delete_certificate,
+    alumni_profile_detail,
 )
 from accounts.views_graph import get_graph_data
 from accounts.views_admin import (
     admin_stats, admin_users_list, admin_user_detail,
     admin_neo4j_cleanup, admin_neo4j_syncall, admin_neo4j_status,
     admin_create_user, admin_neo4j_audit,
+    admin_hall_of_fame_list, admin_hall_of_fame_detail,
 )
 from posts.views import post_list, post_detail, category_list
 
@@ -43,9 +46,12 @@ urlpatterns = [
     path('api/token/refresh/', TokenRefreshView.as_view()),
     path('api/test/', test_protected),
     path('api/alumni/search/', search_alumni),
+    path('api/alumni/<uuid:user_id>/', alumni_profile_detail),
     path('api/me/', me_view),
     path('api/me/update/', update_profile),
     path('api/me/avatar/', upload_avatar),
+    path('api/me/certificates/', add_certificate),
+    path('api/me/certificates/<int:cert_id>/', delete_certificate),
     path('api/password-reset/', request_password_reset),
     path('api/password-reset/confirm/', confirm_password_reset),
     path("graph/", graph_page),
@@ -66,6 +72,9 @@ urlpatterns = [
     # ── Faculty & Department API ──
     path('api/faculties/', list_faculties),
     path('api/departments/', list_departments),
+    path('api/hall-of-fame/', list_hall_of_fame),
+    path('api/admin/hall-of-fame/', admin_hall_of_fame_list),
+    path('api/admin/hall-of-fame/<int:pk>/', admin_hall_of_fame_detail),
     path('api/', include('knowledge.urls')),
     path('', include('accounts.urls')),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

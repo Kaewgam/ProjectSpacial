@@ -12,6 +12,8 @@ export interface AuthUser {
     prefix: string;
     first_name: string;
     last_name: string;
+    phone_number: string;
+    github_link: string;
     faculty: string;
     department: string;
     occupation: string;
@@ -29,9 +31,17 @@ export interface AuthUser {
         id?: number;
         occupation: string;
         company: string;
+        work_email: string;
         is_current: boolean;
         start_year: string;
         end_year: string;
+    }[];
+    skills?: string[];
+    certificates?: {
+        id: number;
+        name: string;
+        issue_year: string;
+        image: string | null;
     }[];
     date_joined: string;
     avatar: string | null;

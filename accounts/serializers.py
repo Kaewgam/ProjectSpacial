@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import User, Faculty, Department, UserProfile, UserEducation, UserCareer
+from .models import User, Faculty, Department, UserProfile, UserEducation, UserCareer, HallOfFame
 
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
@@ -67,3 +67,59 @@ class RegisterSerializer(serializers.ModelSerializer):
             )
             
         return user
+
+
+class UserProfileSerializer(serializers.ModelSerializer):
+    first_name = serializers.CharField(source='profile.first_name', read_only=True, default='')
+    last_name = serializers.CharField(source='profile.last_name', read_only=True, default='')
+    email = serializers.CharField(source='profile.email', read_only=True, default='')
+    phone_number = serializers.CharField(source='profile.phone_number', read_only=True, default='')
+    github_link = serializers.CharField(source='profile.github_link', read_only=True, default='')
+    avatar = serializers.SerializerMethodField()
+    faculty = serializers.SerializerMethodField()
+    department = serializers.SerializerMethodField()
+    graduation_year = serializers.SerializerMethodField()
+    skills = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = ['id', 'student_id', 'first_name', 'last_name', 'email', 'phone_number', 'github_link', 'avatar', 'faculty', 'department', 'graduation_year', 'skills']
+
+    def get_avatar(self, obj):
+        profile = getattr(obj, 'profile', None)
+        if profile and profile.avatar:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(profile.avatar.url)
+            return profile.avatar.url
+        return None
+
+    def get_faculty(self, obj):
+        edu = obj.educations.first()
+        return edu.faculty_ref.name if edu and edu.faculty_ref else ""
+
+    def get_department(self, obj):
+        edu = obj.educations.first()
+        return edu.department_ref.name if edu and edu.department_ref else ""
+
+    def get_graduation_year(self, obj):
+        edu = obj.educations.first()
+        return edu.graduation_year if edu else ""
+
+    def get_skills(self, obj):
+        return [us.skill.name for us in obj.skills.all()]
+
+
+class HallOfFameSerializer(serializers.ModelSerializer):
+    user = UserProfileSerializer(read_only=True)
+    user_id = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.all(), source='user', write_only=True
+    )
+    category_display = serializers.CharField(source='get_category_display', read_only=True)
+
+    class Meta:
+        model = HallOfFame
+        fields = [
+            'id', 'user', 'user_id', 'award_year', 'category', 'category_display',
+            'title', 'description', 'image', 'created_at', 'updated_at'
+        ]

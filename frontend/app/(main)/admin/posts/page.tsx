@@ -19,6 +19,7 @@ interface Post {
   is_active:   boolean;
   created_at:  string;
   cover_image: string | null;
+  images?:     string[];
   excerpt:     string;
 }
 
@@ -165,13 +166,16 @@ export default function AdminPostsPage() {
                 >
                   {/* Title */}
                   <div className="col-span-5 flex items-start gap-2.5">
-                    {post.cover_image && (
+                    {(post.images && post.images.length > 0) ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={post.images[0]} alt="" className="w-10 h-10 rounded-lg object-cover flex-shrink-0 mt-0.5" />
+                    ) : post.cover_image && (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={post.cover_image} alt="" className="w-10 h-10 rounded-lg object-cover flex-shrink-0 mt-0.5" />
                     )}
                     <div className="min-w-0">
                       <p className="text-sm font-medium text-gray-800 line-clamp-1">{post.title}</p>
-                      <p className="text-xs text-gray-400 line-clamp-1 mt-0.5">{post.excerpt}</p>
+                      <p className="text-xs text-gray-400 line-clamp-1 mt-0.5">{post.content ? (post.content.length > 50 ? post.content.substring(0, 50) + "..." : post.content) : ""}</p>
                       <div className="flex gap-1.5 mt-1">
                         {post.pinned && (
                           <span className="text-[10px] bg-amber-50 text-amber-600 border border-amber-200 px-1.5 py-0.5 rounded-full font-semibold">📌 ปักหมุด</span>

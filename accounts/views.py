@@ -104,6 +104,7 @@ def search_alumni(request):
             "department":  edu.department_ref.name if edu and edu.department_ref else "",
             "occupation":  career.occupation if career else "",
             "company":     career.company if career else "",
+            "skills":      [us.skill.name for us in user.skills.all()],
             "educations": [
                 {
                     "faculty": e.faculty_ref.name if e.faculty_ref else "",
@@ -135,6 +136,57 @@ def search_alumni(request):
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
+def alumni_profile_detail(request, user_id):
+    try:
+        user = User.objects.get(id=user_id, role='ALUMNI')
+    except User.DoesNotExist:
+        return Response({"error": "ไม่พบศิษย์เก่า"}, status=status.HTTP_404_NOT_FOUND)
+
+    profile = getattr(user, 'profile', None)
+    
+    return Response({
+        "id": str(user.id),
+        "student_id": user.student_id,
+        "email": profile.email if profile else "",
+        "prefix": profile.prefix if profile else "",
+        "first_name": profile.first_name if profile else "",
+        "last_name": profile.last_name if profile else "",
+        "phone_number": profile.phone_number if profile else "",
+        "github_link": profile.github_link if profile else "",
+        "educations": [
+            {
+                "faculty_name": e.faculty_ref.name if e.faculty_ref else "",
+                "department_name": e.department_ref.name if e.department_ref else "",
+                "degree_level": e.degree_level,
+                "graduation_year": e.graduation_year
+            } for e in user.educations.all()
+        ],
+        "careers": [
+            {
+                "occupation": c.occupation,
+                "company": c.company,
+                "work_email": c.work_email,
+                "is_current": c.is_current,
+                "start_year": c.start_year,
+                "end_year": c.end_year
+            } for c in user.careers.all()
+        ],
+        "skills": [us.skill.name for us in user.skills.all()],
+        "certificates": [
+            {
+                "id": cert.id,
+                "name": cert.name,
+                "issue_year": cert.issue_year,
+                "image": request.build_absolute_uri(cert.image.url) if cert.image else None,
+            } for cert in user.certificates.all()
+        ],
+        "date_joined": timezone.localtime(user.date_joined).strftime("%d/%m/%Y"),
+        "avatar": request.build_absolute_uri(profile.avatar.url) if profile and profile.avatar else None,
+    })
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def me_view(request):
     user = request.user
     profile = getattr(user, 'profile', None)
@@ -149,12 +201,15 @@ def me_view(request):
         "prefix": profile.prefix if profile else "",
         "first_name": profile.first_name if profile else "",
         "last_name": profile.last_name if profile else "",
+        "phone_number": profile.phone_number if profile else "",
+        "github_link": profile.github_link if profile else "",
         "faculty": edu.faculty_ref.name if edu and edu.faculty_ref else "",
         "faculty_id": edu.faculty_ref.id if edu and edu.faculty_ref else None,
         "department": edu.department_ref.name if edu and edu.department_ref else "",
         "department_id": edu.department_ref.id if edu and edu.department_ref else None,
         "occupation": career.occupation if career else "",
         "company": career.company if career else "",
+        "work_email": career.work_email if career else "",
         "educations": [
             {
                 "id": e.id,
@@ -171,10 +226,20 @@ def me_view(request):
                 "id": c.id,
                 "occupation": c.occupation,
                 "company": c.company,
+                "work_email": c.work_email,
                 "is_current": c.is_current,
                 "start_year": c.start_year,
                 "end_year": c.end_year
             } for c in user.careers.all()
+        ],
+        "skills": [us.skill.name for us in user.skills.all()],
+        "certificates": [
+            {
+                "id": cert.id,
+                "name": cert.name,
+                "issue_year": cert.issue_year,
+                "image": request.build_absolute_uri(cert.image.url) if cert.image else None,
+            } for cert in user.certificates.all()
         ],
         "date_joined": timezone.localtime(user.date_joined).strftime("%d/%m/%Y"),
         "avatar": request.build_absolute_uri(profile.avatar.url) if profile and profile.avatar else None,
@@ -188,10 +253,10 @@ def me_view(request):
 @permission_classes([IsAuthenticated])
 def update_profile(request):
     user = request.user
-    from .models import UserProfile, UserEducation, UserCareer
+    from .models import UserProfile, UserEducation, UserCareer, Skill, UserSkill
     profile, _ = UserProfile.objects.get_or_create(user=user)
     
-    simple_fields = ['prefix', 'first_name', 'last_name', 'email']
+    simple_fields = ['prefix', 'first_name', 'last_name', 'email', 'phone_number', 'github_link']
     for field in simple_fields:
         if field in request.data:
             setattr(profile, field, request.data[field])
@@ -261,13 +326,54 @@ def update_profile(request):
                 user=user,
                 occupation=car.get('occupation', ''),
                 company=car.get('company', ''),
+                work_email=car.get('work_email', ''),
                 is_current=car.get('is_current', True),
                 start_year=car.get('start_year', ''),
                 end_year=car.get('end_year', '')
             )
 
+    # Handle skills
+    if 'skills' in request.data and isinstance(request.data['skills'], list):
+        user.skills.all().delete()
+        for skill_name in request.data['skills']:
+            skill_name = str(skill_name).strip()
+            if skill_name:
+                skill, _ = Skill.objects.get_or_create(name__iexact=skill_name, defaults={'name': skill_name})
+                UserSkill.objects.create(user=user, skill=skill)
+
     user.save() # trigger Neo4j sync
     return Response({"message": "อัปเดตข้อมูลสำเร็จ"})
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def add_certificate(request):
+    user = request.user
+    name = request.data.get('name', '')
+    issue_year = request.data.get('issue_year', '')
+    image = request.FILES.get('image')
+    
+    if not name or not image:
+        return Response({"error": "กรุณากรอกชื่อและแนบรูปใบประกาศ"}, status=status.HTTP_400_BAD_REQUEST)
+        
+    from .models import UserCertificate
+    cert = UserCertificate.objects.create(user=user, name=name, issue_year=issue_year, image=image)
+    user.save() # trigger Neo4j sync (optional, since certificates might not affect graph, but good to keep consistency)
+    
+    return Response({"message": "เพิ่มใบประกาศสำเร็จ", "id": cert.id})
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def delete_certificate(request, cert_id):
+    user = request.user
+    from .models import UserCertificate
+    try:
+        cert = UserCertificate.objects.get(id=cert_id, user=user)
+        cert.delete()
+        user.save()
+        return Response({"message": "ลบใบประกาศสำเร็จ"})
+    except UserCertificate.DoesNotExist:
+        return Response({"error": "ไม่พบใบประกาศ"}, status=status.HTTP_404_NOT_FOUND)
 
 
 @api_view(['POST'])
@@ -395,11 +501,46 @@ def list_departments(request):
     data = [
         {
             "id": d.id,
-            "name": d.name,
+            "name": f"{d.short_name} {d.name} ({d.id})" if d.short_name else d.name,
+            "original_name": d.name,
             "short_name": d.short_name,
             "faculty_id": d.faculty_id,
             "faculty_name": d.faculty.name,
         }
         for d in qs
     ]
-    return Response(data)
+    return Response(data)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def list_hall_of_fame(request):
+    """
+    Public API to list Hall of Fame entries with searching and filtering.
+    """
+    from .models import HallOfFame
+    from .serializers import HallOfFameSerializer
+
+    category = request.GET.get('category', '').strip()
+    award_year = request.GET.get('award_year', '').strip()
+    q = request.GET.get('q', '').strip()
+
+    qs = HallOfFame.objects.select_related('user__profile').prefetch_related(
+        'user__educations__faculty_ref', 'user__educations__department_ref'
+    ).order_by('-award_year', 'category', 'user__student_id')
+
+    if category:
+        qs = qs.filter(category=category)
+    if award_year:
+        qs = qs.filter(award_year=award_year)
+    if q:
+        qs = qs.filter(
+            Q(user__profile__first_name__icontains=q) |
+            Q(user__profile__last_name__icontains=q) |
+            Q(user__student_id__icontains=q) |
+            Q(title__icontains=q) |
+            Q(description__icontains=q)
+        ).distinct()
+
+    serializer = HallOfFameSerializer(qs, many=True, context={'request': request})
+    return Response(serializer.data)

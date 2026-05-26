@@ -60,6 +60,10 @@ export default function Navbar() {
                         แชร์ความรู้น่าสนใจ
                     </Link>
 
+                    <Link href="/hall-of-fame" className="hover:text-black">
+                        หอเกียรติยศ
+                    </Link>
+
 
                 </div>
 

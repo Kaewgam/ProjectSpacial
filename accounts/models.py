@@ -88,6 +88,8 @@ class UserProfile(models.Model):
     ])
     first_name = models.CharField(max_length=100, blank=True, default='')
     last_name = models.CharField(max_length=100, blank=True, default='')
+    phone_number = models.CharField(max_length=20, blank=True, default='')
+    github_link = models.URLField(max_length=255, blank=True, default='')
     avatar = models.ImageField(upload_to='avatars/', blank=True, null=True)
 
     def __str__(self):
@@ -107,9 +109,10 @@ class UserCareer(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='careers')
     occupation = models.CharField(max_length=150, blank=True, default='')
     company = models.CharField(max_length=150, blank=True, default='')
+    work_email = models.EmailField(blank=True, default='')
     is_current = models.BooleanField(default=True)
     start_year = models.CharField(max_length=4, blank=True, default='')
-    end_year = models.CharField(max_length=4, blank=True, default='')
+    end_year = models.CharField(max_length=50, blank=True, default='')
 
     def __str__(self):
         return f"{self.user.student_id} - {self.occupation} at {self.company}"
@@ -135,3 +138,50 @@ def delete_user_in_neo4j(sender, instance, **kwargs):
         delete_user_from_neo4j(instance.student_id)
     except Exception as e:
         print(f"Failed to delete user {instance.student_id} from Neo4j: {e}")
+
+
+class Skill(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+
+    def __str__(self):
+        return self.name
+
+class UserSkill(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='skills')
+    skill = models.ForeignKey(Skill, on_delete=models.CASCADE, related_name='users')
+
+    class Meta:
+        unique_together = ('user', 'skill')
+
+    def __str__(self):
+        return f"{self.user.student_id} - {self.skill.name}"
+
+class UserCertificate(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='certificates')
+    name = models.CharField(max_length=200)
+    image = models.ImageField(upload_to='certificates/', blank=True, null=True)
+    issue_year = models.CharField(max_length=4, blank=True, default='')
+
+    def __str__(self):
+        return f"{self.user.student_id} - {self.name}"
+
+class HallOfFame(models.Model):
+    CATEGORY_CHOICES = [
+        ('ACADEMIC', 'Academic Excellence'),
+        ('BUSINESS', 'Business & Career Success'),
+        ('SOCIAL', 'Social Contribution'),
+        ('SPORTS_ARTS', 'Sports & Arts'),
+        ('RISING_STAR', 'Rising Star'),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='hall_of_fames')
+    award_year = models.CharField(max_length=4)
+    category = models.CharField(max_length=50, choices=CATEGORY_CHOICES)
+    title = models.CharField(max_length=200)
+    description = models.TextField()
+    image = models.ImageField(upload_to='hall_of_fame/', blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.user.student_id} - {self.title} ({self.award_year})"

@@ -26,6 +26,7 @@ def post_to_dict(post, request):
         'created_at':  timezone.localtime(post.created_at).strftime('%d/%m/%Y'),
         'updated_at':  timezone.localtime(post.updated_at).strftime('%d/%m/%Y %H:%M'),
         'cover_image': request.build_absolute_uri(post.cover_image.url) if post.cover_image else None,
+        'images':      [request.build_absolute_uri(img.image.url) for img in getattr(post, 'images').all()] if hasattr(post, 'images') else [],
         'created_by':  post.created_by.student_id if post.created_by else None,
     }
 
@@ -37,7 +38,7 @@ def post_to_dict(post, request):
 @parser_classes([MultiPartParser, FormParser, JSONParser])
 def post_list(request):
     if request.method == 'GET':
-        qs = Post.objects.select_related('created_by')
+        qs = Post.objects.select_related('created_by').prefetch_related('images')
         if is_admin(request):
             pass # Keep qs as all() with select_related
         else:
@@ -108,6 +109,14 @@ def post_list(request):
         post.cover_image = request.FILES['cover_image']
     post.save()
 
+    from .models import PostImage
+    images_data = request.FILES.getlist('images')
+    if images_data:
+        for img in images_data:
+            PostImage.objects.create(post=post, image=img)
+    elif 'cover_image' in request.FILES:
+        PostImage.objects.create(post=post, image=request.FILES['cover_image'])
+
     return Response({'message': 'สร้างโพสต์สำเร็จ', 'post': post_to_dict(post, request)},
                     status=status.HTTP_201_CREATED)
 
@@ -147,6 +156,13 @@ def post_detail(request, post_id):
         if 'cover_image' in request.FILES:
             post.cover_image = request.FILES['cover_image']
         post.save()
+
+        if 'images' in request.FILES:
+            from .models import PostImage
+            post.images.all().delete()
+            for img in request.FILES.getlist('images'):
+                PostImage.objects.create(post=post, image=img)
+        
         return Response({'message': 'อัปเดตสำเร็จ', 'post': post_to_dict(post, request)})
 
     if request.method == 'DELETE':
