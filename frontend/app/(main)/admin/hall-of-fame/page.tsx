@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import api from "@/lib/api";
-import { Plus, Edit, Trash2, Search, Award, X, Check, Loader2, User } from "lucide-react";
+import { Award, Plus, Search, Edit, Trash2, X, Loader2, User, Check } from "lucide-react";
+import ConfirmModal from "@/components/ConfirmModal";
 
 interface Alumnus {
   id: string;
@@ -41,13 +42,13 @@ const CATEGORY_CHOICES = [
   { value: "BUSINESS", label: "ความสำเร็จในอาชีพ/ธุรกิจ (Business & Career Success)" },
   { value: "SOCIAL", label: "ทำประโยชน์ต่อสังคม (Social Contribution)" },
   { value: "SPORTS_ARTS", label: "กีฬาและศิลปวัฒนธรรม (Sports & Arts)" },
-  { value: "RISING_STAR", label: "ดาวรุ่ง (Rising Star)" },
 ];
 
 export default function AdminHallOfFame() {
   const [entries, setEntries] = useState<HallOfFameEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [confirmModal, setConfirmModal] = useState<{ message: string; danger?: boolean; onConfirm: () => void } | null>(null);
 
   // Modal control
   const [isOpen, setIsOpen] = useState(false);
@@ -185,17 +186,20 @@ export default function AdminHallOfFame() {
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm("คุณแน่ใจหรือไม่ว่าต้องการลบข้อมูลนี้ออกจากหอเกียรติยศ?")) {
-      return;
-    }
-
-    try {
-      await api.delete(`/api/admin/hall-of-fame/${id}/`);
-      fetchEntries();
-    } catch (err) {
-      console.error(err);
-      alert("ไม่สามารถลบข้อมูลได้");
-    }
+    setConfirmModal({
+      message: "คุณแน่ใจหรือไม่ว่าต้องการลบข้อมูลนี้ออกจากหอเกียรติยศ?",
+      danger: true,
+      onConfirm: async () => {
+        setConfirmModal(null);
+        try {
+          await api.delete(`/api/admin/hall-of-fame/${id}/`);
+          fetchEntries();
+        } catch (err) {
+          console.error(err);
+          alert("ไม่สามารถลบข้อมูลได้");
+        }
+      }
+    });
   };
 
   return (
@@ -446,6 +450,18 @@ export default function AdminHallOfFame() {
                 />
               </div>
 
+              {/* Award Description */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">รายละเอียดผลงาน / ประวัติการทำงาน</label>
+                <textarea
+                  rows={4}
+                  placeholder="รายละเอียดของรางวัลหรือผลงานที่โดดเด่น..."
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  className="w-full bg-slate-50 border border-gray-200 focus:border-amber-500/50 rounded-xl px-4 py-2.5 text-slate-900 outline-none transition-all text-sm resize-none"
+                />
+              </div>
+
               {/* Image Upload */}
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">รูปภาพเกียรติยศ (ถ้ามี)</label>
@@ -495,6 +511,15 @@ export default function AdminHallOfFame() {
             </form>
           </div>
         </div>
+      )}
+
+      {confirmModal && (
+        <ConfirmModal
+          message={confirmModal.message}
+          danger={confirmModal.danger}
+          onConfirm={confirmModal.onConfirm}
+          onCancel={() => setConfirmModal(null)}
+        />
       )}
     </div>
   );

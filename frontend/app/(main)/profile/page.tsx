@@ -8,10 +8,11 @@ import api from "@/lib/api";
 import {
     User, Mail, BookOpen, Briefcase, GraduationCap,
     Calendar, LogOut, Shield, Users, Search,
-    Pencil, Check, X, Camera,
+    Pencil, Check, X, Camera, FileText
 } from "lucide-react";
 import Link from "next/link";
 import { useFacultyDept } from "@/lib/useFacultyDept";
+import ConfirmModal from "@/components/ConfirmModal";
 
 const SUGGESTED_SKILLS = [
     "Python", "JavaScript", "TypeScript", "React", "Node.js", "Java", "C#", "C++", 
@@ -28,6 +29,7 @@ export default function ProfilePage() {
     const [saving, setSaving] = useState(false);
     const [pendingAvatarFile, setPendingAvatarFile] = useState<File | null>(null);
     const [pendingAvatarPreview, setPendingAvatarPreview] = useState<string | null>(null);
+    const [confirmModal, setConfirmModal] = useState<{ message: string; danger?: boolean; onConfirm: () => void } | null>(null);
 
     interface PendingCert {
         id: string;
@@ -44,7 +46,7 @@ export default function ProfilePage() {
     const [form, setForm] = useState({
         prefix: "", first_name: "", last_name: "", email: "",
         phone_number: "", github_link: "",
-        educations: [] as { faculty_id: string | null, department_id: string | null, degree_level: string, graduation_year: string }[],
+        educations: [] as { faculty_id: string | null, department_id: string | null, other_faculty: string, other_department: string, degree_level: string, graduation_year: string }[],
         careers: [] as { occupation: string, company: string, work_email: string, is_current: boolean, start_year: string, end_year: string }[],
         skills: [] as string[],
     });
@@ -65,11 +67,13 @@ export default function ProfilePage() {
                 phone_number: user.phone_number ?? "",
                 github_link: user.github_link ?? "",
                 educations: user.educations && user.educations.length > 0 ? user.educations.map(e => ({
-                    faculty_id: e.faculty_id ? String(e.faculty_id) : null,
-                    department_id: e.department_id ? String(e.department_id) : null,
+                    faculty_id: e.faculty_id ? String(e.faculty_id) : (e.faculty_name && !e.faculty_id ? 'OTHER' : null),
+                    department_id: e.department_id ? String(e.department_id) : (e.department_name && !e.department_id ? 'OTHER' : null),
+                    other_faculty: e.faculty_name && !e.faculty_id ? e.faculty_name : "",
+                    other_department: e.department_name && !e.department_id ? e.department_name : "",
                     degree_level: e.degree_level || "",
                     graduation_year: e.graduation_year || ""
-                })) : [{ faculty_id: null, department_id: null, degree_level: "", graduation_year: "" }],
+                })) : [{ faculty_id: null, department_id: null, other_faculty: "", other_department: "", degree_level: "", graduation_year: "" }],
                 careers: user.careers && user.careers.length > 0 ? user.careers.map(c => ({
                     occupation: c.occupation || "",
                     company: c.company || "",
@@ -108,7 +112,14 @@ export default function ProfilePage() {
                 email: form.email,
                 phone_number: form.phone_number,
                 github_link: form.github_link,
-                educations: form.educations,
+                educations: form.educations.map(e => ({
+                    faculty_id: e.faculty_id === 'OTHER' ? null : e.faculty_id,
+                    department_id: e.department_id === 'OTHER' ? null : e.department_id,
+                    other_faculty: e.faculty_id === 'OTHER' ? e.other_faculty : "",
+                    other_department: e.department_id === 'OTHER' ? e.other_department : "",
+                    degree_level: e.degree_level,
+                    graduation_year: e.graduation_year
+                })),
                 careers: form.careers,
                 skills: form.skills,
             });
@@ -391,32 +402,56 @@ export default function ProfilePage() {
                                                     <div>
                                                         <p className="text-xs text-gray-400 mb-1">คณะ</p>
                                                         {editMode ? (
-                                                            <select value={edu.faculty_id ?? ""} onChange={(e) => {
-                                                                const newEdu = [...form.educations];
-                                                                newEdu[idx].faculty_id = e.target.value ? String(e.target.value) : null;
-                                                                newEdu[idx].department_id = null;
-                                                                setForm(p => ({ ...p, educations: newEdu }));
-                                                            }} className={selectClass}>
-                                                                <option value="">เลือกคณะ</option>
-                                                                {faculties.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
-                                                            </select>
+                                                            <>
+                                                                <select value={edu.faculty_id ?? ""} onChange={(e) => {
+                                                                    const newEdu = [...form.educations];
+                                                                    newEdu[idx].faculty_id = e.target.value ? String(e.target.value) : null;
+                                                                    newEdu[idx].department_id = null;
+                                                                    setForm(p => ({ ...p, educations: newEdu }));
+                                                                }} className={selectClass}>
+                                                                    <option value="">เลือกคณะ</option>
+                                                                    {faculties.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+                                                                    <option value="OTHER">อื่นๆ (ระบุเอง)</option>
+                                                                </select>
+                                                                {edu.faculty_id === 'OTHER' && (
+                                                                    <input type="text" placeholder="ระบุชื่อคณะ..." value={edu.other_faculty} onChange={(e) => {
+                                                                        const newEdu = [...form.educations];
+                                                                        newEdu[idx].other_faculty = e.target.value;
+                                                                        setForm(p => ({ ...p, educations: newEdu }));
+                                                                    }} className={`${inputClass} mt-2`} />
+                                                                )}
+                                                            </>
                                                         ) : (
-                                                            <p className="text-gray-800 font-medium text-sm">{faculties.find(f => String(f.id) === String(edu.faculty_id))?.name || "—"}</p>
+                                                            <p className="text-gray-800 font-medium text-sm">
+                                                                {edu.faculty_id === 'OTHER' ? (edu.other_faculty || "—") : (faculties.find(f => String(f.id) === String(edu.faculty_id))?.name || "—")}
+                                                            </p>
                                                         )}
                                                     </div>
                                                     <div>
                                                         <p className="text-xs text-gray-400 mb-1">สาขาวิชา</p>
                                                         {editMode ? (
-                                                            <select value={edu.department_id ?? ""} onChange={(e) => {
-                                                                const newEdu = [...form.educations];
-                                                                newEdu[idx].department_id = e.target.value ? String(e.target.value) : null;
-                                                                setForm(p => ({ ...p, educations: newEdu }));
-                                                            }} disabled={!edu.faculty_id} className={`${selectClass} ${!edu.faculty_id ? "opacity-50 cursor-not-allowed" : ""}`}>
-                                                                <option value="">เลือกสาขาวิชา</option>
-                                                                {eduFilteredDepts.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-                                                            </select>
+                                                            <>
+                                                                <select value={edu.department_id ?? ""} onChange={(e) => {
+                                                                    const newEdu = [...form.educations];
+                                                                    newEdu[idx].department_id = e.target.value ? String(e.target.value) : null;
+                                                                    setForm(p => ({ ...p, educations: newEdu }));
+                                                                }} disabled={!edu.faculty_id} className={`${selectClass} ${!edu.faculty_id ? "opacity-50 cursor-not-allowed" : ""}`}>
+                                                                    <option value="">เลือกสาขาวิชา</option>
+                                                                    {eduFilteredDepts.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                                                                    <option value="OTHER">อื่นๆ (ระบุเอง)</option>
+                                                                </select>
+                                                                {edu.department_id === 'OTHER' && (
+                                                                    <input type="text" placeholder="ระบุชื่อสาขาวิชา..." value={edu.other_department} onChange={(e) => {
+                                                                        const newEdu = [...form.educations];
+                                                                        newEdu[idx].other_department = e.target.value;
+                                                                        setForm(p => ({ ...p, educations: newEdu }));
+                                                                    }} className={`${inputClass} mt-2`} />
+                                                                )}
+                                                            </>
                                                         ) : (
-                                                            <p className="text-gray-800 font-medium text-sm">{departments.find(d => String(d.id) === String(edu.department_id))?.name || "—"}</p>
+                                                            <p className="text-gray-800 font-medium text-sm">
+                                                                {edu.department_id === 'OTHER' ? (edu.other_department || "—") : (departments.find(d => String(d.id) === String(edu.department_id))?.name || "—")}
+                                                            </p>
                                                         )}
                                                     </div>
                                                     <div>
@@ -657,22 +692,31 @@ export default function ProfilePage() {
                                             <div key={cert.id} className="relative bg-gray-50 p-4 rounded-xl border border-gray-200 flex flex-col items-center text-center">
                                                 {editMode && (
                                                     <button onClick={async () => {
-                                                        if (confirm("ต้องการลบใบประกาศนี้ใช่หรือไม่?")) {
-                                                            try {
-                                                                await api.delete(`/api/me/certificates/${cert.id}/`);
-                                                                await refreshUser();
-                                                                toast.success("ลบใบประกาศสำเร็จ");
-                                                            } catch {
-                                                                toast.error("เกิดข้อผิดพลาด");
+                                                        setConfirmModal({
+                                                            message: "ต้องการลบใบประกาศนี้ใช่หรือไม่?",
+                                                            danger: true,
+                                                            onConfirm: async () => {
+                                                                setConfirmModal(null);
+                                                                try {
+                                                                    await api.delete(`/api/me/certificates/${cert.id}/`);
+                                                                    await refreshUser();
+                                                                    toast.success("ลบใบประกาศสำเร็จ");
+                                                                } catch {
+                                                                    toast.error("เกิดข้อผิดพลาด");
+                                                                }
                                                             }
-                                                        }
-                                                    }} className="absolute top-2 right-2 text-red-500 hover:text-red-700 bg-white shadow rounded-full p-1 transition" title="ลบข้อมูลนี้">
+                                                        });
+                                                    }} className="absolute top-2 right-2 text-red-500 hover:text-red-700 bg-white shadow rounded-full p-1 transition z-20" title="ลบข้อมูลนี้">
                                                         <X size={14} />
                                                     </button>
                                                 )}
                                                 {cert.image && (
-                                                    <div className="w-full h-32 mb-3 bg-gray-200 rounded-lg overflow-hidden flex items-center justify-center">
+                                                    <div className="w-full h-32 mb-3 bg-gray-200 rounded-lg overflow-hidden flex items-center justify-center relative group cursor-pointer">
                                                         <img src={cert.image} alt={cert.name} className="max-w-full max-h-full object-contain" />
+                                                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition z-10 pointer-events-none">
+                                                            <span className="text-white text-xs font-semibold px-2 py-1 bg-black/50 rounded">คลิกดูรูปใหญ่</span>
+                                                        </div>
+                                                        <a href={cert.image} target="_blank" rel="noopener noreferrer" className="absolute inset-0 z-0" />
                                                     </div>
                                                 )}
                                                 <p className="text-gray-800 font-medium text-sm line-clamp-2">{cert.name}</p>
@@ -682,11 +726,22 @@ export default function ProfilePage() {
                                         {/* Pending certificates */}
                                         {pendingCertificates.map((cert) => (
                                             <div key={cert.id} className="relative bg-green-50 p-4 rounded-xl border border-green-200 flex flex-col items-center text-center">
-                                                <button onClick={() => setPendingCertificates(prev => prev.filter(c => c.id !== cert.id))} className="absolute top-2 right-2 text-red-500 hover:text-red-700 bg-white shadow rounded-full p-1 transition" title="ยกเลิกการเพิ่ม">
+                                                <button onClick={() => setPendingCertificates(prev => prev.filter(c => c.id !== cert.id))} className="absolute top-2 right-2 text-red-500 hover:text-red-700 bg-white shadow rounded-full p-1 transition z-20" title="ยกเลิกการเพิ่ม">
                                                     <X size={14} />
                                                 </button>
-                                                <div className="w-full h-32 mb-3 bg-white rounded-lg overflow-hidden flex items-center justify-center border border-green-100">
-                                                    <img src={cert.previewUrl} alt={cert.name} className="max-w-full max-h-full object-contain" />
+                                                <div className="w-full h-32 mb-3 bg-white rounded-lg overflow-hidden flex items-center justify-center border border-green-100 relative group cursor-pointer">
+                                                    {cert.file.type === 'application/pdf' ? (
+                                                        <div className="flex flex-col items-center text-gray-400">
+                                                            <FileText size={40} className="mb-2 text-red-400" />
+                                                            <span className="text-[10px] font-semibold text-red-500 uppercase tracking-wide">PDF FILE</span>
+                                                        </div>
+                                                    ) : (
+                                                        <img src={cert.previewUrl} alt={cert.name} className="max-w-full max-h-full object-contain" />
+                                                    )}
+                                                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition z-10 pointer-events-none">
+                                                        <span className="text-white text-xs font-semibold px-2 py-1 bg-black/50 rounded">คลิกดูรูปใหญ่</span>
+                                                    </div>
+                                                    <a href={cert.previewUrl} target="_blank" rel="noopener noreferrer" className="absolute inset-0 z-0" />
                                                 </div>
                                                 <p className="text-gray-800 font-medium text-sm line-clamp-2">{cert.name}</p>
                                                 <p className="text-xs text-gray-500 mt-1">ปีที่ได้รับ: {cert.issue_year || "—"}</p>
@@ -704,7 +759,7 @@ export default function ProfilePage() {
                                             };
                                             const file = target.image.files[0];
                                             if (!file || !target.name.value) {
-                                                toast.error("กรุณากรอกชื่อและเลือกไฟล์รูปภาพ");
+                                                toast.error("กรุณากรอกชื่อและเลือกไฟล์รูปภาพหรือ PDF");
                                                 return;
                                             }
                                             
@@ -724,7 +779,7 @@ export default function ProfilePage() {
                                                 <input name="name" required placeholder="ชื่อใบประกาศ" className={inputClass} />
                                                 <input name="issue_year" placeholder="ปีที่ได้รับ (พ.ศ.)" className={inputClass} />
                                                 <div className="sm:col-span-2">
-                                                    <input type="file" name="image" required accept="image/*" className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-[#414E51] file:text-white hover:file:bg-[#2b3436]" />
+                                                    <input type="file" name="image" required accept="image/*,application/pdf" className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-[#414E51] file:text-white hover:file:bg-[#2b3436]" />
                                                 </div>
                                             </div>
                                             <button type="submit" className="mt-3 px-4 py-2 bg-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-300 transition flex items-center gap-2">
@@ -736,10 +791,17 @@ export default function ProfilePage() {
                             </div>
                         )}
                 </>
-
-
-
             </div>
+            
+            {/* Confirm Modal */}
+            {confirmModal && (
+                <ConfirmModal
+                    message={confirmModal.message}
+                    danger={confirmModal.danger}
+                    onConfirm={confirmModal.onConfirm}
+                    onCancel={() => setConfirmModal(null)}
+                />
+            )}
         </div>
     );
 }

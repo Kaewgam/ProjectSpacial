@@ -99,6 +99,8 @@ class UserEducation(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='educations')
     faculty_ref = models.ForeignKey(Faculty, on_delete=models.SET_NULL, null=True, blank=True, related_name='user_educations')
     department_ref = models.ForeignKey(Department, on_delete=models.SET_NULL, null=True, blank=True, related_name='user_educations')
+    other_faculty = models.CharField(max_length=150, blank=True, default='')
+    other_department = models.CharField(max_length=150, blank=True, default='')
     degree_level = models.CharField(max_length=50, blank=True, default='') # ป.ตรี, ป.โท, ป.เอก
     graduation_year = models.CharField(max_length=4, blank=True, default='')
 
@@ -171,7 +173,6 @@ class HallOfFame(models.Model):
         ('BUSINESS', 'Business & Career Success'),
         ('SOCIAL', 'Social Contribution'),
         ('SPORTS_ARTS', 'Sports & Arts'),
-        ('RISING_STAR', 'Rising Star'),
     ]
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='hall_of_fames')

@@ -174,8 +174,8 @@ def admin_users_list(request):
             "prefix": profile.prefix if profile else "",
             "first_name": profile.first_name if profile else "",
             "last_name": profile.last_name if profile else "",
-            "faculty": edu.faculty_ref.name if edu and edu.faculty_ref else "",
-            "department": edu.department_ref.name if edu and edu.department_ref else "",
+            "faculty": (edu.faculty_ref.name if edu.faculty_ref else edu.other_faculty) if edu else "",
+            "department": (edu.department_ref.name if edu.department_ref else edu.other_department) if edu else "",
             "faculty_id": edu.faculty_ref.id if edu and edu.faculty_ref else None,
             "department_id": edu.department_ref.id if edu and edu.department_ref else None,
             "occupation": career.occupation if career else "",
@@ -184,6 +184,8 @@ def admin_users_list(request):
                 {
                     "faculty_id": e.faculty_ref.id if e.faculty_ref else None,
                     "department_id": e.department_ref.id if e.department_ref else None,
+                    "other_faculty": e.other_faculty,
+                    "other_department": e.other_department,
                     "degree_level": e.degree_level,
                     "graduation_year": e.graduation_year
                 } for e in u.educations.all()
@@ -275,6 +277,8 @@ def admin_user_detail(request, user_id):
                         user=target,
                         faculty_ref=fac,
                         department_ref=dept,
+                        other_faculty=ed.get('other_faculty', ''),
+                        other_department=ed.get('other_department', ''),
                         degree_level=ed.get('degree_level', ''),
                         graduation_year=ed.get('graduation_year', '')
                     )

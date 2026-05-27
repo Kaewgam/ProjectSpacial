@@ -9,6 +9,8 @@ class RegisterSerializer(serializers.ModelSerializer):
     last_name = serializers.CharField(required=False, allow_blank=True)
     faculty_id = serializers.PrimaryKeyRelatedField(queryset=Faculty.objects.all(), required=False, allow_null=True)
     department_id = serializers.PrimaryKeyRelatedField(queryset=Department.objects.all(), required=False, allow_null=True)
+    other_faculty = serializers.CharField(required=False, allow_blank=True)
+    other_department = serializers.CharField(required=False, allow_blank=True)
     occupation = serializers.CharField(required=False, allow_blank=True)
     company = serializers.CharField(required=False, allow_blank=True)
 
@@ -27,7 +29,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         fields = [
             'student_id', 'password',
             'email', 'prefix', 'first_name', 'last_name',
-            'faculty_id', 'department_id', 'occupation', 'company'
+            'faculty_id', 'department_id', 'other_faculty', 'other_department', 'occupation', 'company'
         ]
 
     def create(self, validated_data):
@@ -48,11 +50,16 @@ class RegisterSerializer(serializers.ModelSerializer):
         # Create Education
         faculty = validated_data.get('faculty_id')
         department = validated_data.get('department_id')
-        if faculty or department:
+        other_faculty = validated_data.get('other_faculty', '')
+        other_department = validated_data.get('other_department', '')
+        
+        if faculty or department or other_faculty or other_department:
             UserEducation.objects.create(
                 user=user,
                 faculty_ref=faculty,
-                department_ref=department
+                department_ref=department,
+                other_faculty=other_faculty,
+                other_department=other_department
             )
             
         # Create Career
@@ -96,11 +103,19 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
     def get_faculty(self, obj):
         edu = obj.educations.first()
-        return edu.faculty_ref.name if edu and edu.faculty_ref else ""
+        if not edu:
+            return ""
+        if edu.faculty_ref:
+            return edu.faculty_ref.name
+        return edu.other_faculty
 
     def get_department(self, obj):
         edu = obj.educations.first()
-        return edu.department_ref.name if edu and edu.department_ref else ""
+        if not edu:
+            return ""
+        if edu.department_ref:
+            return edu.department_ref.name
+        return edu.other_department
 
     def get_graduation_year(self, obj):
         edu = obj.educations.first()

@@ -31,7 +31,6 @@ export const CATEGORIES = [
   { value: "BUSINESS", label: "ความสำเร็จในอาชีพ/ธุรกิจ", icon: Briefcase, bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200", dot: "#10b981" },
   { value: "SOCIAL", label: "ทำประโยชน์ต่อสังคม", icon: Heart, bg: "bg-rose-50", text: "text-rose-700", border: "border-rose-200", dot: "#f43f5e" },
   { value: "SPORTS_ARTS", label: "กีฬาและศิลปวัฒนธรรม", icon: Palette, bg: "bg-purple-50", text: "text-purple-700", border: "border-purple-200", dot: "#a855f7" },
-  { value: "RISING_STAR", label: "ดาวรุ่ง", icon: Sparkles, bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-200", dot: "#f59e0b" },
 ];
 
 export function HallOfFameModal({
@@ -55,23 +54,24 @@ export function HallOfFameModal({
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-white w-full max-w-2xl max-h-[90vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden">
 
-        {/* Header with accent color */}
-        <div className="relative flex-shrink-0">
-          <div className="w-full h-28 sm:h-36" style={{ background: `linear-gradient(135deg, ${catStyle.dot}22, ${catStyle.dot}08)` }}>
-            <div className="absolute top-0 left-0 right-0 h-1.5" style={{ background: catStyle.dot }} />
-          </div>
 
-          {/* Close */}
-          <button
-            onClick={onClose}
-            className="absolute top-4 right-4 p-2 bg-black/40 hover:bg-black/60 text-white rounded-full backdrop-blur-md transition-colors shadow-sm"
-          >
-            <X size={20} />
-          </button>
+        {/* Top colored strip */}
+        <div className="w-full h-1.5 flex-shrink-0" style={{ background: catStyle.dot }} />
 
-          {/* Avatar overlay */}
-          <div className="absolute -bottom-10 left-6 sm:left-8">
-            <div className="w-20 h-20 rounded-2xl overflow-hidden border-4 border-white shadow-lg">
+        {/* Close */}
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 p-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-full transition-colors shadow-sm z-10"
+        >
+          <X size={20} />
+        </button>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-6 sm:p-8">
+
+          {/* User Info Header */}
+          <div className="flex items-center gap-4 mb-6">
+            <div className="w-16 h-16 rounded-2xl overflow-hidden border border-gray-200 shadow-sm flex-shrink-0">
               {entry.user.avatar ? (
                 <img src={entry.user.avatar} alt="avatar" className="w-full h-full object-cover" />
               ) : (
@@ -80,17 +80,13 @@ export function HallOfFameModal({
                 </div>
               )}
             </div>
+            <div>
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 leading-tight mb-1">
+                {entry.user.first_name} {entry.user.last_name}
+              </h2>
+              <p className="text-sm text-gray-500">รหัสนักศึกษา: {entry.user.student_id}</p>
+            </div>
           </div>
-        </div>
-
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto pt-14 px-6 sm:px-8 pb-6">
-
-          {/* Name & Student ID */}
-          <h2 className="text-2xl font-bold text-gray-900 mb-1">
-            {entry.user.first_name} {entry.user.last_name}
-          </h2>
-          <p className="text-sm text-gray-500 mb-5">รหัสนักศึกษา: {entry.user.student_id}</p>
 
           {/* Info Tags */}
           <div className="flex flex-wrap gap-2 mb-6">
@@ -135,20 +131,16 @@ export function HallOfFameModal({
             )}
           </div>
 
-          {/* Skills Section */}
-          {entry.user.skills && entry.user.skills.length > 0 && (
+          {/* Description Section */}
+          {entry.description && (
             <div className="mt-6 bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
               <h3 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
                 <BookOpen size={16} className="text-violet-600" />
-                ทักษะและความสามารถ
+                รายละเอียดผลงาน
               </h3>
-              <div className="flex flex-wrap gap-2">
-                {entry.user.skills.map((skill, idx) => (
-                  <span key={idx} className="bg-violet-50 text-violet-700 px-3 py-1 rounded-full text-xs font-semibold border border-violet-100">
-                    {skill}
-                  </span>
-                ))}
-              </div>
+              <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
+                {entry.description}
+              </p>
             </div>
           )}
         </div>

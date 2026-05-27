@@ -61,6 +61,13 @@ def sync_user_to_neo4j(user):
                         SET f.name = $faculty
                         MERGE (u)-[:STUDIED_IN]->(f)
                     """, student_id=user.student_id, faculty_id=edu.faculty_ref.id, faculty=edu.faculty_ref.name)
+                elif getattr(edu, 'other_faculty', None):
+                    session.run("""
+                        MATCH (u:User {student_id: $student_id})
+                        MERGE (f:Faculty {id: $faculty_id})
+                        SET f.name = $faculty
+                        MERGE (u)-[:STUDIED_IN]->(f)
+                    """, student_id=user.student_id, faculty_id=f"OTHER_{edu.other_faculty}", faculty=edu.other_faculty)
 
                 if edu.department_ref:
                     session.run("""
@@ -69,6 +76,13 @@ def sync_user_to_neo4j(user):
                         SET d.name = $department
                         MERGE (u)-[:BELONGS_TO]->(d)
                     """, student_id=user.student_id, department_id=edu.department_ref.id, department=edu.department_ref.name)
+                elif getattr(edu, 'other_department', None):
+                    session.run("""
+                        MATCH (u:User {student_id: $student_id})
+                        MERGE (d:Department {id: $department_id})
+                        SET d.name = $department
+                        MERGE (u)-[:BELONGS_TO]->(d)
+                    """, student_id=user.student_id, department_id=f"OTHER_{edu.other_department}", department=edu.other_department)
 
         # 💼 Company & Occupation
         if hasattr(user, 'careers'):

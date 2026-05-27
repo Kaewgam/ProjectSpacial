@@ -7,6 +7,7 @@ import {
   ChevronLeft, ImagePlus, X,
   AlignLeft, Tag, User, FileText, Send, Trash2
 } from "lucide-react";
+import ConfirmModal from "@/components/ConfirmModal";
 import api from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -60,6 +61,7 @@ export default function EditPostPage() {
   const [deleting, setDeleting]     = useState(false);
   const [submitted, setSubmitted]   = useState(false);
   const [error, setError]           = useState("");
+  const [confirmModal, setConfirmModal] = useState<{ message: string; danger?: boolean; onConfirm: () => void } | null>(null);
 
   // ── Guard: เฉพาะ Admin ──
   useEffect(() => {
@@ -171,15 +173,21 @@ export default function EditPostPage() {
 
   // ── Delete → DELETE /api/posts/<id>/ ──
   const handleDelete = async () => {
-    if (!confirm("คุณแน่ใจหรือไม่ว่าต้องการลบโพสต์นี้? การดำเนินการนี้ไม่สามารถย้อนกลับได้")) return;
-    setDeleting(true);
-    try {
-      await api.delete(`/api/posts/${id}/`);
-      router.push("/");
-    } catch (err: any) {
-      setError("เกิดข้อผิดพลาดในการลบโพสต์");
-      setDeleting(false);
-    }
+    setConfirmModal({
+      message: "คุณแน่ใจหรือไม่ว่าต้องการลบโพสต์นี้? การดำเนินการนี้ไม่สามารถย้อนกลับได้",
+      danger: true,
+      onConfirm: async () => {
+        setConfirmModal(null);
+        setDeleting(true);
+        try {
+          await api.delete(`/api/posts/${id}/`);
+          router.push("/");
+        } catch (err: any) {
+          setError("เกิดข้อผิดพลาดในการลบโพสต์");
+          setDeleting(false);
+        }
+      }
+    });
   };
 
   // ─── Loading / Unauthorized ───────────────────────
@@ -369,6 +377,15 @@ export default function EditPostPage() {
           </div>
         </div>
       </form>
+
+      {confirmModal && (
+        <ConfirmModal
+          message={confirmModal.message}
+          danger={confirmModal.danger}
+          onConfirm={confirmModal.onConfirm}
+          onCancel={() => setConfirmModal(null)}
+        />
+      )}
     </div>
   );
 }

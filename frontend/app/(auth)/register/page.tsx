@@ -20,6 +20,8 @@ export default function Register() {
         password: "",
         faculty_id: null as string | null,
         department_id: null as string | null,
+        other_faculty: "",
+        other_department: "",
         occupation: "",
         company: "",
     });
@@ -66,8 +68,10 @@ export default function Register() {
                 password: form.password,
                 occupation: form.occupation,
                 company: form.company,
-                faculty_id: form.faculty_id,
-                department_id: form.department_id,
+                faculty_id: form.faculty_id === 'OTHER' ? null : form.faculty_id,
+                department_id: form.department_id === 'OTHER' ? null : form.department_id,
+                other_faculty: form.faculty_id === 'OTHER' ? form.other_faculty : "",
+                other_department: form.department_id === 'OTHER' ? form.other_department : "",
                 role: "ALUMNI",
             });
             toast.success("สมัครสมาชิกสำเร็จ 🎉");
@@ -185,9 +189,19 @@ export default function Register() {
                                         {faculties.map((f) => (
                                             <option key={f.id} value={f.id}>{f.name}</option>
                                         ))}
+                                        <option value="OTHER">อื่นๆ (ระบุเอง)</option>
                                     </select>
                                     <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">▾</span>
                                 </div>
+                                {form.faculty_id === 'OTHER' && (
+                                    <input
+                                        type="text"
+                                        placeholder="ระบุชื่อคณะ..."
+                                        value={form.other_faculty}
+                                        onChange={(e) => set("other_faculty", e.target.value)}
+                                        className={`${inputClass} mt-2`}
+                                    />
+                                )}
                             </div>
                             <div>
                                 <label className={labelClass}>สาขาวิชา</label>
@@ -202,9 +216,19 @@ export default function Register() {
                                         {filteredDepts.map((d) => (
                                             <option key={d.id} value={d.id}>{d.name}</option>
                                         ))}
+                                        <option value="OTHER">อื่นๆ (ระบุเอง)</option>
                                     </select>
                                     <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">▾</span>
                                 </div>
+                                {form.department_id === 'OTHER' && (
+                                    <input
+                                        type="text"
+                                        placeholder="ระบุชื่อสาขาวิชา..."
+                                        value={form.other_department}
+                                        onChange={(e) => set("other_department", e.target.value)}
+                                        className={`${inputClass} mt-2`}
+                                    />
+                                )}
                             </div>
                         </div>
                     </div>

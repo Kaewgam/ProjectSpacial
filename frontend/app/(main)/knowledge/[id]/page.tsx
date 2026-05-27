@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ChevronLeft, MessageCircle, Send, ExternalLink, Trash2, Pencil, X, CornerDownRight } from "lucide-react";
 import api from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
+import ConfirmModal from "@/components/ConfirmModal";
 
 export default function KnowledgeDetail() {
   const params = useParams();
@@ -25,6 +26,7 @@ export default function KnowledgeDetail() {
   const [editTitle, setEditTitle] = useState("");
   const [editDesc, setEditDesc] = useState("");
   const [editUrl, setEditUrl] = useState("");
+  const [confirmModal, setConfirmModal] = useState<{ message: string; danger?: boolean; onConfirm: () => void } | null>(null);
 
   const fetchPost = () => {
     api.get(`/api/knowledge/${id}/`)
@@ -62,13 +64,19 @@ export default function KnowledgeDetail() {
   };
 
   const handleDeletePost = async () => {
-    if (!confirm("ต้องการลบกระทู้นี้ใช่หรือไม่?")) return;
-    try {
-      await api.delete(`/api/knowledge/${id}/`);
-      router.push("/knowledge");
-    } catch {
-      alert("ลบไม่สำเร็จ");
-    }
+    setConfirmModal({
+      message: "ต้องการลบกระทู้นี้ใช่หรือไม่?",
+      danger: true,
+      onConfirm: async () => {
+        setConfirmModal(null);
+        try {
+          await api.delete(`/api/knowledge/${id}/`);
+          router.push("/knowledge");
+        } catch {
+          alert("ลบไม่สำเร็จ");
+        }
+      }
+    });
   };
 
   const handleEditPost = async (e: React.FormEvent) => {
@@ -88,13 +96,19 @@ export default function KnowledgeDetail() {
   };
 
   const handleDeleteComment = async (commentId: number) => {
-    if (!confirm("ต้องการลบคอมเมนต์นี้ใช่หรือไม่?")) return;
-    try {
-      await api.delete(`/api/knowledge/${id}/comments/${commentId}/`);
-      fetchPost();
-    } catch {
-      alert("ลบไม่สำเร็จ");
-    }
+    setConfirmModal({
+      message: "ต้องการลบคอมเมนต์นี้ใช่หรือไม่?",
+      danger: true,
+      onConfirm: async () => {
+        setConfirmModal(null);
+        try {
+          await api.delete(`/api/knowledge/${id}/comments/${commentId}/`);
+          fetchPost();
+        } catch {
+          alert("ลบไม่สำเร็จ");
+        }
+      }
+    });
   };
 
   if (loading) {
@@ -301,6 +315,16 @@ export default function KnowledgeDetail() {
            )}
         </div>
 
+        </div>
+        
+        {confirmModal && (
+          <ConfirmModal
+            message={confirmModal.message}
+            danger={confirmModal.danger}
+            onConfirm={confirmModal.onConfirm}
+            onCancel={() => setConfirmModal(null)}
+          />
+        )}
       </div>
     </div>
   );

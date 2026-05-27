@@ -100,15 +100,15 @@ def search_alumni(request):
             "role":        user.role,
             "first_name":  profile.first_name if profile else "",
             "last_name":   profile.last_name if profile else "",
-            "faculty":     edu.faculty_ref.name if edu and edu.faculty_ref else "",
-            "department":  edu.department_ref.name if edu and edu.department_ref else "",
+            "faculty":     (edu.faculty_ref.name if edu.faculty_ref else edu.other_faculty) if edu else "",
+            "department":  (edu.department_ref.name if edu.department_ref else edu.other_department) if edu else "",
             "occupation":  career.occupation if career else "",
             "company":     career.company if career else "",
             "skills":      [us.skill.name for us in user.skills.all()],
             "educations": [
                 {
-                    "faculty": e.faculty_ref.name if e.faculty_ref else "",
-                    "department": e.department_ref.name if e.department_ref else "",
+                    "faculty": (e.faculty_ref.name if e.faculty_ref else e.other_faculty),
+                    "department": (e.department_ref.name if e.department_ref else e.other_department),
                     "degree_level": e.degree_level,
                     "graduation_year": e.graduation_year
                 } for e in user.educations.all()
@@ -155,8 +155,8 @@ def alumni_profile_detail(request, user_id):
         "github_link": profile.github_link if profile else "",
         "educations": [
             {
-                "faculty_name": e.faculty_ref.name if e.faculty_ref else "",
-                "department_name": e.department_ref.name if e.department_ref else "",
+                "faculty_name": (e.faculty_ref.name if e.faculty_ref else e.other_faculty),
+                "department_name": (e.department_ref.name if e.department_ref else e.other_department),
                 "degree_level": e.degree_level,
                 "graduation_year": e.graduation_year
             } for e in user.educations.all()
@@ -203,9 +203,9 @@ def me_view(request):
         "last_name": profile.last_name if profile else "",
         "phone_number": profile.phone_number if profile else "",
         "github_link": profile.github_link if profile else "",
-        "faculty": edu.faculty_ref.name if edu and edu.faculty_ref else "",
+        "faculty": (edu.faculty_ref.name if edu.faculty_ref else edu.other_faculty) if edu else "",
         "faculty_id": edu.faculty_ref.id if edu and edu.faculty_ref else None,
-        "department": edu.department_ref.name if edu and edu.department_ref else "",
+        "department": (edu.department_ref.name if edu.department_ref else edu.other_department) if edu else "",
         "department_id": edu.department_ref.id if edu and edu.department_ref else None,
         "occupation": career.occupation if career else "",
         "company": career.company if career else "",
@@ -214,9 +214,9 @@ def me_view(request):
             {
                 "id": e.id,
                 "faculty_id": e.faculty_ref.id if e.faculty_ref else None,
-                "faculty_name": e.faculty_ref.name if e.faculty_ref else "",
+                "faculty_name": (e.faculty_ref.name if e.faculty_ref else e.other_faculty),
                 "department_id": e.department_ref.id if e.department_ref else None,
-                "department_name": e.department_ref.name if e.department_ref else "",
+                "department_name": (e.department_ref.name if e.department_ref else e.other_department),
                 "degree_level": e.degree_level,
                 "graduation_year": e.graduation_year
             } for e in user.educations.all()
@@ -287,6 +287,11 @@ def update_profile(request):
         elif 'department_id' in request.data:
             edu.department_ref = None
             
+        if 'other_faculty' in request.data:
+            edu.other_faculty = request.data['other_faculty']
+        if 'other_department' in request.data:
+            edu.other_department = request.data['other_department']
+
         edu.save()
 
     # Handle multiple educations
@@ -300,6 +305,8 @@ def update_profile(request):
                     user=user,
                     faculty_ref=fac,
                     department_ref=dept,
+                    other_faculty=ed.get('other_faculty', ''),
+                    other_department=ed.get('other_department', ''),
                     degree_level=ed.get('degree_level', ''),
                     graduation_year=ed.get('graduation_year', '')
                 )
@@ -355,6 +362,24 @@ def add_certificate(request):
     
     if not name or not image:
         return Response({"error": "กรุณากรอกชื่อและแนบรูปใบประกาศ"}, status=status.HTTP_400_BAD_REQUEST)
+        
+    if image.name.lower().endswith('.pdf') or image.content_type == 'application/pdf':
+        try:
+            import fitz
+            from django.core.files.base import ContentFile
+            import os
+            
+            pdf_bytes = image.read()
+            doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+            if doc.page_count > 0:
+                page = doc.load_page(0)
+                pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))  # 2x resolution
+                img_bytes = pix.tobytes("png")
+                
+                base_name, _ = os.path.splitext(image.name)
+                image = ContentFile(img_bytes, name=base_name + ".png")
+        except Exception as e:
+            return Response({"error": f"ไม่สามารถประมวลผลไฟล์ PDF ได้: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
         
     from .models import UserCertificate
     cert = UserCertificate.objects.create(user=user, name=name, issue_year=issue_year, image=image)
