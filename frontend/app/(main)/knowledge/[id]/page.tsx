@@ -326,6 +326,5 @@ export default function KnowledgeDetail() {
           />
         )}
       </div>
-    </div>
   );
 }
