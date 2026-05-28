@@ -21,6 +21,7 @@ interface Post {
   cover_image: string | null;
   images?:     string[];
   excerpt:     string;
+  content?:    string;
 }
 
 const DEFAULT_CAT_STYLE = "bg-gray-50 text-gray-600 border-gray-200";
