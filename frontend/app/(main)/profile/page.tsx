@@ -159,8 +159,10 @@ export default function ProfilePage() {
                 educations: user.educations && user.educations.length > 0 ? user.educations.map(e => ({
                     faculty_id: e.faculty_id ? String(e.faculty_id) : null,
                     department_id: e.department_id ? String(e.department_id) : null,
+                    other_faculty: e.faculty_name && !e.faculty_id ? e.faculty_name : "",
+                    other_department: e.department_name && !e.department_id ? e.department_name : "",
                     degree_level: e.degree_level || "", graduation_year: e.graduation_year || ""
-                })) : [{ faculty_id: null, department_id: null, degree_level: "", graduation_year: "" }],
+                })) : [{ faculty_id: null, department_id: null, other_faculty: "", other_department: "", degree_level: "", graduation_year: "" }],
                 careers: user.careers && user.careers.length > 0 ? user.careers.map(c => ({
                     occupation: c.occupation || "", company: c.company || "", work_email: c.work_email || "",
                     is_current: c.is_current ?? true, start_year: c.start_year || "", end_year: c.end_year || ""
@@ -490,7 +492,7 @@ export default function ProfilePage() {
                                         );
                                     })}
                                     {editMode && (
-                                        <button onClick={() => setForm(p => ({ ...p, educations: [...p.educations, { faculty_id: null, department_id: null, degree_level: "", graduation_year: "" }] }))}
+                                        <button onClick={() => setForm(p => ({ ...p, educations: [...p.educations, { faculty_id: null, department_id: null, other_faculty: "", other_department: "", degree_level: "", graduation_year: "" }] }))}
                                             className="w-full py-2 border-2 border-dashed border-gray-300 rounded-xl text-gray-500 font-medium hover:border-[#414E51] hover:text-[#414E51] transition flex items-center justify-center gap-2">
                                             + เพิ่มประวัติการศึกษา
                                         </button>

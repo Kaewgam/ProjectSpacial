@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import api from "@/lib/api";
@@ -125,7 +125,7 @@ function NewsCard({ item, onClick, styleMap }: { item: Post; onClick: () => void
 }
 
 // ─── Main Page ────────────────────────────────────────
-export default function Home() {
+function HomeContent() {
   const { user } = useAuth();
   const isAdmin  = user?.role === "ADMIN";
   const searchParams = useSearchParams();
@@ -397,6 +397,14 @@ export default function Home() {
         />
       )}
     </div>
+  );
+}
+
+export default function Home() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-gray-50 flex items-center justify-center"><div className="w-8 h-8 border-4 border-violet-500 border-t-transparent rounded-full animate-spin" /></div>}>
+      <HomeContent />
+    </Suspense>
   );
 }
 
