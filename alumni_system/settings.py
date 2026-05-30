@@ -155,7 +155,14 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 # ถ้ามี URL ของ Cloudinary ให้ใช้ Cloudinary เป็นที่เก็บรูปภาพ (รันบนคลาวด์)
 if os.getenv('CLOUDINARY_URL'):
-    DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+    STORAGES = {
+        "default": {
+            "BACKEND": "cloudinary_storage.storage.MediaCloudinaryStorage",
+        },
+        "staticfiles": {
+            "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+        },
+    }
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
