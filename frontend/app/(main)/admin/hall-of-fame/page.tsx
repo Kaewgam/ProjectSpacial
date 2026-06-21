@@ -179,7 +179,8 @@ export default function AdminHallOfFame() {
       }
       setIsOpen(false);
       fetchEntries();
-    } catch (err: any) {
+    } catch (error) {
+      const err = error as any;
       console.error(err);
       alert(err.response?.data?.error || "เกิดข้อผิดพลาดในการบันทึกข้อมูล");
     }

@@ -49,7 +49,7 @@ export default function AdminPostsPage() {
   useEffect(() => {
     api.get("/api/posts/categories/").then(res => {
       const map: Record<string, string> = {};
-      res.data.forEach((c: any) => {
+      res.data.forEach((c: { value: string; bg: string; text: string; border: string }) => {
         map[c.value] = `${c.bg} ${c.text} ${c.border}`;
       });
       setCatColors(map);

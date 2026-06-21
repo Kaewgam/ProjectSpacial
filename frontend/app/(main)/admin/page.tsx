@@ -4,9 +4,9 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import api from "@/lib/api";
 import {
-  Users, UserCheck, UserPlus, Activity,
-  Database, GitBranch, TrendingUp, RefreshCw,
-  Building2, GraduationCap, FileText, Settings
+  Users,
+  Database, GitBranch, RefreshCw,
+  GraduationCap, FileText
 } from "lucide-react";
 
 // ─── Types ───────────────────────────────────────────

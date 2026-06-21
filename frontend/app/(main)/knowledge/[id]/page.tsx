@@ -14,6 +14,7 @@ export default function KnowledgeDetail() {
   const router = useRouter();
   const { user } = useAuth();
   
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [post, setPost] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   
@@ -42,6 +43,7 @@ export default function KnowledgeDetail() {
 
   useEffect(() => {
     if (id) fetchPost();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   const handleComment = async (e: React.FormEvent) => {
@@ -56,7 +58,7 @@ export default function KnowledgeDetail() {
       setCommentContent("");
       setReplyTo(null);
       fetchPost();
-    } catch (err) {
+    } catch {
       alert("เกิดข้อผิดพลาดในการคอมเมนต์ หรือคุณยังไม่ได้เข้าสู่ระบบ");
     } finally {
       setSubmitting(false);
@@ -120,6 +122,7 @@ export default function KnowledgeDetail() {
   const canEditOrDeletePost = user && (user.role === 'ADMIN' || user.id === post.author?.id);
 
   // Helper to render comments recursively
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const renderComment = (c: any, index: number | string, isReply = false) => {
     const isCommentAuthor = user && (user.role === 'ADMIN' || user.id === c.author?.id);
     const authorName = c.author ? `${c.author.first_name} ${c.author.last_name}` : "ไม่ระบุตัวตน";
@@ -167,6 +170,7 @@ export default function KnowledgeDetail() {
          {/* Render Nested Replies */}
          {c.replies && c.replies.length > 0 && (
            <div className="mt-4 border-t border-gray-50 pt-3">
+              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
               {c.replies.map((reply: any) => renderComment(reply, '', true))}
            </div>
          )}
@@ -270,6 +274,7 @@ export default function KnowledgeDetail() {
         </h3>
 
         <div className="space-y-4 mb-8">
+           {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
            {post.comments?.map((c: any, i: number) => renderComment(c, i + 1))}
            {(!post.comments || post.comments.length === 0) && (
               <div className="text-center py-8 text-gray-400 text-sm bg-gray-50 rounded-2xl border border-dashed border-gray-200">

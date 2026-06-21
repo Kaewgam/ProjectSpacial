@@ -6,6 +6,7 @@ import { MessageCircle, ExternalLink, Plus, Search } from "lucide-react";
 import api from "@/lib/api";
 
 export default function KnowledgeList() {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [posts, setPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
@@ -29,6 +30,7 @@ export default function KnowledgeList() {
       fetchPosts();
     }, 300);
     return () => clearTimeout(delayDebounceFn);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q]);
 
   const handleCreate = async (e: React.FormEvent) => {
@@ -45,7 +47,7 @@ export default function KnowledgeList() {
       setNewDesc("");
       setNewUrl("");
       fetchPosts();
-    } catch (err) {
+    } catch {
       alert("เกิดข้อผิดพลาดในการสร้างโพสต์");
     }
   };

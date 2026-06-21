@@ -33,17 +33,13 @@ export function useFacultyDept(facultyId?: string | number | null) {
   const [loading, setLoading] = useState(!cachedFaculties);
 
   useEffect(() => {
-    if (cachedFaculties) {
-      setFaculties(cachedFaculties);
-      setDepartments(cachedDepartments ?? []);
-      setLoading(false);
-      return;
+    if (!cachedFaculties) {
+      loadData().then(() => {
+        setFaculties(cachedFaculties ?? []);
+        setDepartments(cachedDepartments ?? []);
+        setLoading(false);
+      }).catch(() => setLoading(false));
     }
-    loadData().then(() => {
-      setFaculties(cachedFaculties ?? []);
-      setDepartments(cachedDepartments ?? []);
-      setLoading(false);
-    }).catch(() => setLoading(false));
   }, []);
 
   // Filter departments by selected faculty

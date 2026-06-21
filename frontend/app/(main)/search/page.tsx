@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Search, ChevronLeft, ChevronRight, User, Briefcase, Building2, MapPin, SlidersHorizontal } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, User, Briefcase, Building2, MapPin } from "lucide-react";
 import api from "@/lib/api";
 import { useFacultyDept } from "@/lib/useFacultyDept";
 import { useAuth } from "@/contexts/AuthContext";
@@ -169,7 +169,6 @@ export default function SearchPage() {
     const [occupation, setOccupation] = useState("");
     const [company, setCompany] = useState("");
     const [page, setPage] = useState(1);
-    const [showFilters, setShowFilters] = useState(false);
 
     const [results, setResults] = useState<AlumniResult[]>([]);
     const [total, setTotal] = useState(0);

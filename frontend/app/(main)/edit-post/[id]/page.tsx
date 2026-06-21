@@ -94,7 +94,7 @@ export default function EditPostPage() {
            setPreviewUrls([p.cover_image]);
         }
       })
-      .catch(err => {
+      .catch(() => {
          setError("ไม่พบโพสต์ที่ต้องการแก้ไข หรือมีข้อผิดพลาด");
       })
       .finally(() => {
@@ -161,7 +161,8 @@ export default function EditPostPage() {
 
       setSubmitted(true);
       setTimeout(() => router.push("/"), 1500);
-    } catch (err: any) {
+    } catch (error) {
+      const err = error as any;
       const msg = err?.response?.data?.errors
         ? Object.values(err.response.data.errors).join(", ")
         : err?.response?.data?.error || "เกิดข้อผิดพลาด กรุณาลองใหม่";
@@ -182,7 +183,7 @@ export default function EditPostPage() {
         try {
           await api.delete(`/api/posts/${id}/`);
           router.push("/");
-        } catch (err: any) {
+        } catch {
           setError("เกิดข้อผิดพลาดในการลบโพสต์");
           setDeleting(false);
         }

@@ -39,7 +39,8 @@ function ResetPasswordForm() {
             if (res.status >= 400) throw new Error(data.error || "เกิดข้อผิดพลาด");
             setDone(true);
             setTimeout(() => router.push("/login"), 3000);
-        } catch (err: any) {
+        } catch (error) {
+            const err = error as any;
             toast.error(err.message || "เกิดข้อผิดพลาด กรุณาลองใหม่");
         } finally {
             setSubmitting(false);

@@ -6,11 +6,10 @@ import { useAuth } from "@/contexts/AuthContext";
 import toast, { Toaster } from "react-hot-toast";
 import api from "@/lib/api";
 import {
-    User, Mail, BookOpen, Briefcase, GraduationCap,
-    Calendar, LogOut, Shield, Users, Search,
+    User, BookOpen, Briefcase, GraduationCap,
+    Calendar, Shield,
     Pencil, Check, X, Camera, FileText
 } from "lucide-react";
-import Link from "next/link";
 import { useFacultyDept } from "@/lib/useFacultyDept";
 import ConfirmModal from "@/components/ConfirmModal";
 
@@ -21,7 +20,7 @@ const SUGGESTED_SKILLS = [
 ];
 
 export default function ProfilePage() {
-    const { user, loading, logout, refreshUser } = useAuth();
+    const { user, loading, refreshUser } = useAuth();
     const router = useRouter();
     const avatarInputRef = useRef<HTMLInputElement>(null);
 
@@ -808,14 +807,3 @@ export default function ProfilePage() {
     );
 }
 
-function InfoRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
-    return (
-        <div className="flex items-start gap-3 p-3 rounded-lg bg-gray-50">
-            <span className="mt-0.5 text-gray-400">{icon}</span>
-            <div>
-                <p className="text-xs text-gray-400 mb-0.5">{label}</p>
-                <p className="text-gray-800 font-medium text-sm">{value}</p>
-            </div>
-        </div>
-    );
-}

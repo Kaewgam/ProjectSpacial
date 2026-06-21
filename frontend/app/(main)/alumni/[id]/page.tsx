@@ -66,7 +66,7 @@ export default function AlumniDetailPage() {
             try {
                 const res = await api.get(`/api/alumni/${alumniId}/`);
                 setAlum(res.data);
-            } catch (err) {
+            } catch {
                 toast.error("ไม่พบข้อมูลศิษย์เก่า");
             } finally {
                 setLoading(false);

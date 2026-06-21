@@ -3,8 +3,8 @@
 import { useEffect, useState, useCallback } from "react";
 import api from "@/lib/api";
 import {
-  Search, ChevronLeft, ChevronRight, Shield, Trash2,
-  Edit, CheckCircle, X, UserPlus, Eye, EyeOff, Info
+  Search, ChevronLeft, ChevronRight, Trash2,
+  Edit, CheckCircle, X, UserPlus, Eye, EyeOff
 } from "lucide-react";
 
 import ConfirmModal from "@/components/ConfirmModal";
@@ -109,7 +109,7 @@ function CreateUserModal({
   const [errors, setErrors] = useState<Partial<CreateForm>>({});
   const [loading, setLoading] = useState(false);
   const [showPass, setShowPass] = useState(false);
-  const [neo4jWarn, setNeo4jWarn] = useState(false);
+  const [neo4jWarn] = useState(false);
   const [generalError, setGeneralError] = useState("");
 
   const [faculties, setFaculties] = useState<FacultyOption[]>([]);

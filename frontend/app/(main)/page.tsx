@@ -37,7 +37,7 @@ interface CategoryDef {
 
 
 // ─── Sub Components ───────────────────────────────────
-function PinnedCard({ item, onClick, styleMap }: { item: Post; onClick: () => void; styleMap: Record<string, any> }) {
+function PinnedCard({ item, onClick, styleMap }: { item: Post; onClick: () => void; styleMap: Record<string, string> }) {
   const style = styleMap[item.category] || { bg: "bg-gray-50", text: "text-gray-700", border: "border-gray-200", dot: "#6b7280" };
   return (
     <div 
@@ -84,7 +84,7 @@ function PinnedCard({ item, onClick, styleMap }: { item: Post; onClick: () => vo
   );
 }
 
-function NewsCard({ item, onClick, styleMap }: { item: Post; onClick: () => void; styleMap: Record<string, any> }) {
+function NewsCard({ item, onClick, styleMap }: { item: Post; onClick: () => void; styleMap: Record<string, string> }) {
   const style = styleMap[item.category] || { bg: "bg-gray-50", text: "text-gray-700", border: "border-gray-200", dot: "#6b7280" };
   return (
     <div 
@@ -131,8 +131,7 @@ function HomeContent() {
   const searchParams = useSearchParams();
 
   const [activeCategory, setActiveCategory] = useState<string>("ทั้งหมด");
-  const [categories, setCategories] = useState<CategoryDef[]>([]);
-  const [styleMap, setStyleMap] = useState<Record<string, any>>({});
+  const [styleMap, setStyleMap] = useState<Record<string, string>>({});
   const [allCategoriesList, setAllCategoriesList] = useState<string[]>(["ทั้งหมด"]);
   const [pinned,   setPinned]   = useState<Post[]>([]);
   const [posts,    setPosts]    = useState<Post[]>([]);
@@ -180,8 +179,7 @@ function HomeContent() {
 
   useEffect(() => {
     api.get("/api/posts/categories/").then(res => {
-      setCategories(res.data);
-      const map: Record<string, any> = {};
+      const map: Record<string, string> = {};
       const valid: string[] = [];
       res.data.forEach((c: CategoryDef) => {
         map[c.value] = c;
@@ -268,7 +266,6 @@ function HomeContent() {
             
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               {hallOfFame.map(entry => {
-                const catStyle = CATEGORIES.find(c => c.value === entry.category) || CATEGORIES[0];
                 return (
                   <div
                     key={entry.id}
@@ -409,7 +406,7 @@ export default function Home() {
 }
 
 // ─── Modal Component ───────────────────────────────────
-function PostModal({ post, isAdmin, onClose, styleMap }: { post: Post; isAdmin?: boolean; onClose: () => void; styleMap: Record<string, any> }) {
+function PostModal({ post, isAdmin, onClose, styleMap }: { post: Post; isAdmin?: boolean; onClose: () => void; styleMap: Record<string, string> }) {
   const style = styleMap[post.category] || { bg: "bg-gray-50", text: "text-gray-700", border: "border-gray-200", dot: "#6b7280" };
   
   useEffect(() => {

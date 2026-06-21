@@ -127,7 +127,8 @@ export default function CreatePostPage() {
 
       setSubmitted(true);
       setTimeout(() => router.push("/"), 1500);
-    } catch (err: any) {
+    } catch (error) {
+      const err = error as any;
       const msg = err?.response?.data?.errors
         ? Object.values(err.response.data.errors).join(", ")
         : err?.response?.data?.error || "เกิดข้อผิดพลาด กรุณาลองใหม่";

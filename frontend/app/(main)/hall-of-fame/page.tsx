@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import api from "@/lib/api";
-import { Search, Award, BookOpen, Briefcase, Heart, Sparkles, Trophy, Palette, ChevronRight, X, Building2, MapPin, GraduationCap, Calendar } from "lucide-react";
+import { Search, Award, Trophy, Building2, Calendar } from "lucide-react";
 
 import { CATEGORIES, HallOfFameEntry, HallOfFameModal } from "@/components/HallOfFameModal";
 
@@ -174,7 +174,6 @@ export default function HallOfFamePage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {entries.map(entry => {
-              const catStyle = getCategoryStyle(entry.category);
               return (
                 <div
                   key={entry.id}

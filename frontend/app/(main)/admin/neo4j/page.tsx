@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import api from "@/lib/api";
 import {
   Database, RefreshCw, Trash2, Zap,
-  CheckCircle, X, AlertTriangle, Activity, Search
+  CheckCircle, AlertTriangle, Activity, Search
 } from "lucide-react";
 
 interface AuditData {

@@ -76,7 +76,8 @@ export default function Register() {
             });
             toast.success("สมัครสมาชิกสำเร็จ 🎉");
             setTimeout(() => router.push("/login"), 1000);
-        } catch (err: any) {
+        } catch (error) {
+            const err = error as any;
             const detail =
                 err?.response?.data?.detail ||
                 err?.response?.data?.message ||

@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { BookOpen, Trophy, Briefcase, Heart, Palette, Sparkles, X, Building2, MapPin, GraduationCap, Calendar } from "lucide-react";
+import { BookOpen, Trophy, Briefcase, Heart, Palette, X, Building2, MapPin, GraduationCap, Calendar } from "lucide-react";
 
 export interface Alumnus {
   id: string;
